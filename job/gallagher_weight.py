@@ -1,13 +1,12 @@
 """
 job/gallagher_weight.py
 Job scraping Gallagher AMC (GALLAGHER_1). Incremental.
-Notify success → CHAT_INFO. DRY_RUN support.
 """
 from __future__ import annotations
 import time
 
 from config.paths import raw_device_dir
-from config.settings import IS_DRY_RUN
+from config.settings import IS_DRY_RUN, DEVICE_ENABLED
 from core.ingest.gallagher_collector import collect_new_sessions
 from core.load.csv_exporter import export_csv_from_parquet
 from core.load.parquet_writer import append_and_dedup
@@ -18,7 +17,7 @@ from core.transform.business.herd_merger import merge_with_herd
 from core.transform.dtype import standardize_schema
 from utils.logger import log
 from utils.console import vprint
-from utils.qc_check import check_not_empty
+from utils.qc_check import check_not_empty, check_herd_join_rate
 import utils.telegram_utils as tg
 
 JOB_NAME    = "gallagher_weight"
@@ -26,6 +25,12 @@ DEVICE_NAME = "GALLAGHER_1"
 
 
 def run() -> dict:
+    # ── Guard: device bị tắt ──────────────────────────────────────────────────
+    if not DEVICE_ENABLED.get(DEVICE_NAME, True):
+        print(f"\n⏭️  {DEVICE_NAME} disabled → bỏ qua")
+        log(JOB_NAME, DEVICE_NAME, "no_new_data", 0, "Device disabled")
+        return {"status": "no_new_data", "reason": "device disabled"}
+
     t0 = time.time()
     print(f"\n{'─'*60}\n🐄 Gallagher Weight Job\n{'─'*60}")
 
@@ -34,7 +39,7 @@ def run() -> dict:
 
     if df_combined is None or df_combined.empty:
         dur = round(time.time() - t0, 2)
-        log(JOB_NAME, DEVICE_NAME, "no_new_data", dur, f"Không có session mới (scanned {n_new})")
+        log(JOB_NAME, DEVICE_NAME, "no_new_data", dur, f"Không có session mới ({n_new} scanned)")
         return {"status": "no_new_data", "n_new_sessions": n_new}
 
     vprint(f"   ✅ {n_new} session mới | {len(df_combined):,} animals")
@@ -47,6 +52,8 @@ def run() -> dict:
 
     herd_df, herd_source = load_herd()
     df_combined = merge_with_herd(df_combined, herd_df)
+    check_herd_join_rate(df_combined, job_name=JOB_NAME, context="Gallagher herd join")
+
     df_combined = add_cattle_type(df_combined)
     df_final    = standardize_schema(df_combined)
     df_master   = append_and_dedup(df_final)
@@ -60,12 +67,14 @@ def run() -> dict:
         tg.send_telegram_message(
             tg.CHAT_INFO,
             f"✅ <b>gallagher_weight</b> hoàn tất\n"
-            f"• Sessions mới: {n_new}\n"
-            f"• Animals: {len(df_final):,}\n"
-            f"• Master: {len(df_master):,}\n"
-            f"• Thời gian: {dur}s",
+            f"• Sessions: {n_new} | Animals: {len(df_final):,}\n"
+            f"• Master: {len(df_master):,} | {dur}s",
         )
 
     print(f"\n✅ Gallagher done | {len(df_final):,} | master: {len(df_master):,} | {dur}s")
-    return {"status": "completed", "n_new_sessions": n_new,
-            "rows_new": len(df_final), "rows_master": len(df_master)}
+    return {
+        "status": "completed",
+        "n_new_sessions": n_new,
+        "rows_new": len(df_final),
+        "rows_master": len(df_master),
+    }

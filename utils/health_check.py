@@ -17,10 +17,8 @@ import time
 import requests
 
 from config.paths import WEIGHT_PARQUET, TOTAL_HERD_PARQUET
-from config.settings import (
-    PTM_BASE_URL, GALLAGHER_BASE,
-    IS_DEV, IS_DRY_RUN, RUN_MODE,
-)
+from config.settings import IS_DEV, IS_DRY_RUN, RUN_MODE
+from config.constants import PTM_BASE_URL, GALLAGHER_BASE
 
 
 # ── Individual checks ─────────────────────────────────────────────────────────

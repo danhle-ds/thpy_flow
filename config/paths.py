@@ -25,36 +25,51 @@ for _env_file in [
 def _e(key: str) -> str:
     val = os.getenv(key)
     if val is None:
-        raise EnvironmentError(f"Thiếu key '{key}' trong path.env hoặc account.env")
+        raise EnvironmentError(f"Thiếu key '{key}' trong env files")
     return val.strip()
 
 
+def _detect_username() -> str:
+    """
+    Tự detect Windows username hiện tại — không hardcode.
+    Dễ chuyển máy tính mà không cần sửa code.
+    """
+    return (
+        os.getenv("USERNAME")   # Windows
+        or os.getenv("USER")    # Unix / Mac
+        or Path.home().name     # fallback: tên thư mục home
+    )
+
+
 # ── Roots từ path.env ─────────────────────────────────────────────────────────
-LOCAL_OUT_DIR = Path(_e("LOCAL_OUT_DIR"))          # D:/DATABASE
-DATA_MARK     = LOCAL_OUT_DIR / _e("DATA_MARK")   # DATA_WARE_HOUSE/DATA_MARK_THPY
-DATA_LAKE_CSV = LOCAL_OUT_DIR / _e("DATA_LAKE_CSV")  # DATA_LAKE/CSV_CLEANED
-DATA_LAKE_RAW = LOCAL_OUT_DIR / _e("DATA_LAKE_RAW")  # DATA_LAKE/RAW
+_RUN_MODE = os.getenv("RUN_MODE", "production")
+LOCAL_OUT_DIR = (
+    Path(r"D:\DATABASE\DEV_ENV")
+    if _RUN_MODE == "dev"
+    else Path(_e("LOCAL_OUT_DIR"))
+)
+
+DATA_MARK     = LOCAL_OUT_DIR / _e("DATA_MARK")
+DATA_LAKE_CSV = LOCAL_OUT_DIR / _e("DATA_LAKE_CSV")
+DATA_LAKE_RAW = LOCAL_OUT_DIR / _e("DATA_LAKE_RAW")
 
 # ── Dept / Job ────────────────────────────────────────────────────────────────
 DEPT_NAME = "HERD_INFO"
 JOB_NAME  = "API_WEIGHT"
 
-# ── Parquet master (weight) ───────────────────────────────────────────────────
-WEIGHT_PARQUET = DATA_MARK / DEPT_NAME / JOB_NAME / "weight_db_api.parquet"
-
-# ── Total herd parquet ────────────────────────────────────────────────────────
+# ── Parquet master ────────────────────────────────────────────────────────────
+WEIGHT_PARQUET     = DATA_MARK / DEPT_NAME / JOB_NAME / "weight_db_api.parquet"
 TOTAL_HERD_PARQUET = (
     LOCAL_OUT_DIR / "DATA_WARE_HOUSE" / "DATA_MARK_THPY" / "INFO_HERD" / "total_herd.parquet"
 )
 
 # ── Total herd XLS fallback (OneDrive) ───────────────────────────────────────
-_USER_ROOT        = Path(_e("USER_ROOT"))            # C:/Users
-_OD_THG           = _e("ONEDRIVE_THG")               # OneDrive - THG
-_FARM_REPORT      = _e("ONEDRIVE_FARM_REPORT_OWNER") # Farm report - Farm report
-_TOTAL_HERD_SUB   = _e("TOTAL_HERD_SUB")             # 1. RAW DATA/...
 TOTAL_HERD_XLS_DIR = (
-    _USER_ROOT / os.getenv("USERNAME", "danh.ln") / _OD_THG
-    / _FARM_REPORT / _TOTAL_HERD_SUB
+    Path(_e("USER_ROOT"))
+    / _detect_username()
+    / _e("ONEDRIVE_THG")
+    / _e("ONEDRIVE_FARM_REPORT_OWNER")
+    / _e("TOTAL_HERD_SUB")
 )
 
 # ── Schema reference ──────────────────────────────────────────────────────────
@@ -62,27 +77,21 @@ HERD_COL_SCHEMA = _ENV_DIR / "herd_col_schema.xlsx"
 
 # ── Raw CSV per device ────────────────────────────────────────────────────────
 def raw_device_dir(device: str) -> Path:
-    """D:/DATABASE/DATA_LAKE/RAW/HERD_INFO/API_WEIGHT/{DEVICE}/"""
     return DATA_LAKE_RAW / DEPT_NAME / JOB_NAME / device
 
-# ── CSV cleaned (db source 1) ─────────────────────────────────────────────────
+# ── CSV cleaned ───────────────────────────────────────────────────────────────
 CSV_CLEANED_DIR = DATA_LAKE_CSV / DEPT_NAME / JOB_NAME
-
-# ── CSV legacy (source 2 — tương lai có thể drop) ────────────────────────────
-CSV_LEGACY_DIR = Path(r"D:\CLEANED_DATA\NUTRITION\WEIGHT")
+CSV_LEGACY_DIR  = Path(r"D:\CLEANED_DATA\NUTRITION\WEIGHT")
 
 # ── Gallagher token cache ─────────────────────────────────────────────────────
 GALLAGHER_TOKEN_FILE = _ENV_DIR / "cache" / "gallagher_tokens.json"
 GALLAGHER_STATE_FILE = DATA_LAKE_RAW / DEPT_NAME / JOB_NAME / "GALLAGHER_1" / "_session_state.json"
 
-# ── Temp chart folder ─────────────────────────────────────────────────────────
+# ── Temp & Log ────────────────────────────────────────────────────────────────
 TEMP_CHART_DIR = Path(r"D:\Temp_file\Nutrition")
-
-# ── Log ───────────────────────────────────────────────────────────────────────
-LOG_FILE = Path(r"D:\Log\api_weight_run_log.csv")
+LOG_FILE       = Path(r"D:\Log\api_weight_run_log.csv")
 
 
-# ── Bootstrap: tạo thư mục cần thiết khi khởi động ───────────────────────────
 def ensure_dirs() -> None:
     for d in [
         WEIGHT_PARQUET.parent,

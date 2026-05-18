@@ -102,15 +102,21 @@ def _fetch_one(
     return pd.DataFrame(records) if records else None
 
 
-def collect_all(date_from: str, date_to: str) -> dict[str, pd.DataFrame]:
+def collect_all(
+    date_from: str,
+    date_to: str,
+    devices: dict[str, str] | None = None,
+) -> dict[str, pd.DataFrame]:
     """
-    Fetch tất cả PTM devices.
-    Returns: {device_name: raw_df}  — chỉ chứa device có data.
+    Fetch PTM devices.
+    devices: subset của PTM_DEVICES — None = lấy tất cả.
+    Returns: {device_name: raw_df}
     """
-    token  = get_token()
+    token      = get_token()
+    target     = devices if devices is not None else PTM_DEVICES
     result: dict[str, pd.DataFrame] = {}
 
-    for device_name, device_id in PTM_DEVICES.items():
+    for device_name, device_id in target.items():
         df = _fetch_one(token, device_id, device_name, date_from, date_to)
         if df is not None and not df.empty:
             result[device_name] = df

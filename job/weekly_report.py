@@ -21,7 +21,7 @@ import pandas as pd
 from jinja2 import Environment, FileSystemLoader
 
 from config.paths import TOTAL_HERD_PARQUET, WEIGHT_PARQUET
-from config.settings import AGE_GROUPS, coverage_threshold, week_of_month
+from config.constants import AGE_GROUPS, coverage_threshold, week_of_month
 from utils.logger import log
 from utils.outlook_utils import send_html_email
 
