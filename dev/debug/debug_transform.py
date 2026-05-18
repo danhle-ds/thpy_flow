@@ -24,7 +24,7 @@ from core.transform.structural.parser import parse_ptm_df
 from core.transform.business.cleaner import clean_ear_tag
 from core.transform.business.herd_loader import load_herd
 from core.transform.business.herd_merger import merge_with_herd
-from core.transform.business.classifier import add_cattle_type
+from core.transform.business.classifier import add_animal_type
 from core.transform.dtype import standardize_schema
 
 DATE_FROM = (date.today() - timedelta(days=1)).strftime("%Y-%m-%d")
@@ -54,8 +54,8 @@ def main():
     print(f"   Source: {src} | {len(herd_df):,} dòng" if herd_df is not None else "   No herd")
 
     _sep("Merge"); df = merge_with_herd(df, herd_df); _snap(df, "merged")
-    _sep("Classify"); df = add_cattle_type(df)
-    print(df["cattle_type"].value_counts().to_string())
+    _sep("Classify"); df = add_animal_type(df)
+    print(df["animal_type"].value_counts().to_string())
 
     _sep("Standardize"); df = standardize_schema(df); _snap(df, "final")
     print(f"\n✅ {len(df):,} dòng | DRY_RUN: không ghi file")

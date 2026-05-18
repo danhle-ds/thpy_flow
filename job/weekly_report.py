@@ -94,7 +94,7 @@ def _query_weighed(month_start_str: str, today_str: str) -> dict[str, dict]:
             FROM read_parquet('{WEIGHT_PARQUET}')
             WHERE date >= '{month_start_str}'
               AND date <= '{today_str}'
-              AND cattle_type = 'heifer'
+              AND animal_type = 'heifer'
               AND age_month >= {ag['weight_min']}
               AND age_month <= {ag['weight_max']}
               AND weight_kg >= {ag['outlier_low']}

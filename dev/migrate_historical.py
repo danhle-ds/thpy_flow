@@ -99,10 +99,10 @@ def migrate():
         print(f"➕ source: {df['source'].value_counts().to_dict()}")
 
 
-    # cattle_type — derive từ group_name
-    if "cattle_type" not in df.columns and "group_name" in df.columns:
-        df["cattle_type"] = df["group_name"].apply(_classify)
-        print(f"➕ cattle_type: {df['cattle_type'].value_counts().to_dict()}")
+    # animal_type — derive từ group_name
+    if "animal_type" not in df.columns and "group_name" in df.columns:
+        df["animal_type"] = df["group_name"].apply(_classify)
+        print(f"➕ animal_type: {df['animal_type'].value_counts().to_dict()}")
 
     # loaded_at — dùng timestamp migration
     df["loaded_at"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")

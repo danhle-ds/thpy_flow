@@ -24,7 +24,7 @@ from core.ingest.ptm_collector import collect_all
 from core.load.csv_exporter import export_csv_from_parquet
 from core.load.parquet_writer import append_and_dedup
 from core.load.raw_writer import save_raw
-from core.transform.business.classifier import add_cattle_type
+from core.transform.business.classifier import add_animal_type
 from core.transform.business.cleaner import clean_ear_tag
 from core.transform.business.herd_loader import load_herd
 from core.transform.business.herd_merger import merge_with_herd
@@ -161,7 +161,7 @@ def run() -> dict:
     check_herd_join_rate(df_all, job_name=JOB_NAME, context="PTM herd join")
 
     # ── Step 7–8: Classify + Standardize ─────────────────────────────────────
-    df_all   = add_cattle_type(df_all)
+    df_all   = add_animal_type(df_all)
     df_final = standardize_schema(df_all)
 
     # ── Step 9–10: Parquet + CSV ──────────────────────────────────────────────

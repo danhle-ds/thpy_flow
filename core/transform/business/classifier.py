@@ -29,13 +29,13 @@ def classify_one(group_name) -> str:
     return "other"
 
 
-def add_cattle_type(df: pd.DataFrame, group_col: str = "group_name") -> pd.DataFrame:
-    """Thêm cột cattle_type vào df."""
+def add_animal_type(df: pd.DataFrame, group_col: str = "group_name") -> pd.DataFrame:
+    """Thêm cột animal_type vào df."""
     df = df.copy()
-    df["cattle_type"] = (
+    df["animal_type"] = (
         df[group_col].apply(classify_one) if group_col in df.columns
         else "other"
     )
-    counts = df["cattle_type"].value_counts().to_dict()
+    counts = df["animal_type"].value_counts().to_dict()
     print(f"   🏷️  Classify: {counts}")
     return df

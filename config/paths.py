@@ -54,7 +54,7 @@ DATA_LAKE_CSV = LOCAL_OUT_DIR / _e("DATA_LAKE_CSV")
 DATA_LAKE_RAW = LOCAL_OUT_DIR / _e("DATA_LAKE_RAW")
 
 # ── Dept / Job ────────────────────────────────────────────────────────────────
-DEPT_NAME = "HERD_INFO"
+DEPT_NAME = "INFO_HERD"
 JOB_NAME  = "API_WEIGHT"
 
 # ── Parquet master ────────────────────────────────────────────────────────────

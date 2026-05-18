@@ -10,7 +10,7 @@ from config.settings import IS_DRY_RUN, DEVICE_ENABLED
 from core.ingest.gallagher_collector import collect_new_sessions
 from core.load.csv_exporter import export_csv_from_parquet
 from core.load.parquet_writer import append_and_dedup
-from core.transform.business.classifier import add_cattle_type
+from core.transform.business.classifier import add_animal_type
 from core.transform.business.cleaner import clean_ear_tag
 from core.transform.business.herd_loader import load_herd
 from core.transform.business.herd_merger import merge_with_herd
@@ -54,7 +54,7 @@ def run() -> dict:
     df_combined = merge_with_herd(df_combined, herd_df)
     check_herd_join_rate(df_combined, job_name=JOB_NAME, context="Gallagher herd join")
 
-    df_combined = add_cattle_type(df_combined)
+    df_combined = add_animal_type(df_combined)
     df_final    = standardize_schema(df_combined)
     df_master   = append_and_dedup(df_final)
     export_csv_from_parquet()

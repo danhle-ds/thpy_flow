@@ -15,7 +15,7 @@ from config.settings import PARQUET_COL_ORDER
 
 _STR_COLS = [
     "source", "device", "date", "time",
-    "no", "ear_tag", "group_name", "cattle_type",
+    "no", "ear_tag", "group_name", "animal_type",
 ]
 _FLOAT32_COLS = ["weight_kg", "age_month"]
 _INT16_COLS   = ["age_days", "dim"]

@@ -1,11 +1,11 @@
 """
 dev/tests/test_classifier.py
-Unit test: classify_one, add_cattle_type
+Unit test: classify_one, add_animal_type
 """
 import pandas as pd
 import pytest
 
-from core.transform.business.classifier import classify_one, add_cattle_type
+from core.transform.business.classifier import classify_one, add_animal_type
 
 
 class TestClassifyOne:
@@ -64,22 +64,22 @@ class TestClassifyOne:
 class TestAddCattleType:
     def test_adds_column(self):
         df = pd.DataFrame({"group_name": ["M1", "H2", "DRY"]})
-        result = add_cattle_type(df)
-        assert "cattle_type" in result.columns
+        result = add_animal_type(df)
+        assert "animal_type" in result.columns
 
     def test_correct_classification(self):
         df = pd.DataFrame({"group_name": ["M1", "H2", "DRY", "HOS1", "C2"]})
-        result = add_cattle_type(df)
-        assert result["cattle_type"].tolist() == [
+        result = add_animal_type(df)
+        assert result["animal_type"].tolist() == [
             "milking_cow", "heifer", "other", "milking_cow", "milking_cow"
         ]
 
     def test_missing_group_col(self):
         df = pd.DataFrame({"other_col": ["x", "y"]})
-        result = add_cattle_type(df)
-        assert (result["cattle_type"] == "other").all()
+        result = add_animal_type(df)
+        assert (result["animal_type"] == "other").all()
 
     def test_does_not_modify_original(self):
         df = pd.DataFrame({"group_name": ["M1"]})
-        add_cattle_type(df)
-        assert "cattle_type" not in df.columns
+        add_animal_type(df)
+        assert "animal_type" not in df.columns
