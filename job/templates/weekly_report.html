@@ -1,0 +1,255 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Báo cáo cân bò tơ tuần — PYHTF</title>
+<style>
+  /* ── Reset ──────────────────────────────────────────── */
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: 'Segoe UI', Arial, sans-serif;
+    background: #f4f6f8;
+    color: #1a1a2e;
+    padding: 24px;
+  }
+
+  /* ── Wrapper ─────────────────────────────────────────── */
+  .wrapper {
+    max-width: 680px;
+    margin: 0 auto;
+    background: #ffffff;
+    border-radius: 12px;
+    overflow: hidden;
+    box-shadow: 0 2px 12px rgba(0,0,0,.08);
+  }
+
+  /* ── Header ──────────────────────────────────────────── */
+  .header {
+    background: linear-gradient(135deg, #1565C0 0%, #0D47A1 100%);
+    padding: 28px 32px;
+    color: #ffffff;
+  }
+  .header .logo { font-size: 28px; margin-bottom: 6px; }
+  .header h1   { font-size: 20px; font-weight: 700; letter-spacing: .3px; }
+  .header .sub { font-size: 13px; opacity: .85; margin-top: 4px; }
+
+  /* ── Section ─────────────────────────────────────────── */
+  .section { padding: 24px 32px; }
+  .section + .section { border-top: 1px solid #e8eaf0; }
+
+  /* ── Summary row ─────────────────────────────────────── */
+  .summary-row {
+    display: flex; gap: 12px; flex-wrap: wrap;
+    margin-bottom: 20px;
+  }
+  .stat-card {
+    flex: 1; min-width: 120px;
+    background: #f0f4ff;
+    border-radius: 8px;
+    padding: 14px 16px;
+    text-align: center;
+  }
+  .stat-card .val  { font-size: 22px; font-weight: 700; color: #1565C0; }
+  .stat-card .lbl  { font-size: 11px; color: #666; margin-top: 3px; }
+
+  /* ── Table ───────────────────────────────────────────── */
+  h2 { font-size: 14px; font-weight: 700; color: #333; margin-bottom: 14px; }
+
+  table {
+    width: 100%; border-collapse: collapse;
+    font-size: 13px;
+  }
+  thead th {
+    background: #1565C0;
+    color: #fff;
+    padding: 10px 12px;
+    text-align: left;
+    font-weight: 600;
+    font-size: 12px;
+    letter-spacing: .3px;
+  }
+  tbody tr:nth-child(even) { background: #f8f9fc; }
+  tbody td {
+    padding: 10px 12px;
+    border-bottom: 1px solid #e8eaf0;
+    vertical-align: middle;
+  }
+
+  /* ── Coverage bar ────────────────────────────────────── */
+  .bar-wrap {
+    display: flex; align-items: center; gap: 8px;
+  }
+  .bar-bg {
+    flex: 1; height: 8px; background: #e0e0e0;
+    border-radius: 4px; overflow: hidden;
+  }
+  .bar-fill {
+    height: 100%; border-radius: 4px;
+    transition: width .3s;
+  }
+  .bar-ok   { background: #43A047; }
+  .bar-warn { background: #FB8C00; }
+  .bar-bad  { background: #E53935; }
+  .pct-label { font-size: 12px; font-weight: 700; min-width: 40px; }
+  .ok   { color: #2E7D32; }
+  .warn { color: #E65100; }
+  .bad  { color: #B71C1C; }
+
+  /* ── Badge ───────────────────────────────────────────── */
+  .badge {
+    display: inline-block;
+    padding: 2px 8px; border-radius: 20px;
+    font-size: 11px; font-weight: 600;
+  }
+  .badge-ok   { background: #E8F5E9; color: #2E7D32; }
+  .badge-warn { background: #FFF3E0; color: #E65100; }
+  .badge-bad  { background: #FFEBEE; color: #B71C1C; }
+
+  /* ── Avg weight table ────────────────────────────────── */
+  .avg-grid {
+    display: flex; gap: 10px; flex-wrap: wrap;
+  }
+  .avg-card {
+    flex: 1; min-width: 140px;
+    border: 1px solid #e0e0e0; border-radius: 8px;
+    padding: 14px 16px;
+  }
+  .avg-card .age-label  { font-size: 12px; color: #555; margin-bottom: 6px; }
+  .avg-card .avg-val    { font-size: 20px; font-weight: 700; color: #1565C0; }
+  .avg-card .avg-sub    { font-size: 11px; color: #888; margin-top: 3px; }
+
+  /* ── Warning banner ──────────────────────────────────── */
+  .warning-banner {
+    background: #FFF8E1;
+    border-left: 4px solid #FFB300;
+    border-radius: 0 8px 8px 0;
+    padding: 14px 16px;
+    font-size: 13px;
+  }
+  .warning-banner strong { color: #E65100; }
+
+  /* ── Footer ──────────────────────────────────────────── */
+  .footer {
+    background: #f8f9fc;
+    border-top: 1px solid #e8eaf0;
+    padding: 16px 32px;
+    font-size: 11px;
+    color: #888;
+    text-align: center;
+  }
+</style>
+</head>
+<body>
+<div class="wrapper">
+
+  <!-- HEADER -->
+  <div class="header">
+    <div class="logo">🐄</div>
+    <h1>Báo cáo cân bò tơ — Tuần {{ week_of_month }}/{{ month_label }}</h1>
+    <div class="sub">Trang trại PYHTF &nbsp;·&nbsp; Kỳ: {{ period_str }}</div>
+  </div>
+
+  <!-- SUMMARY CARDS -->
+  <div class="section">
+    <div class="summary-row">
+      <div class="stat-card">
+        <div class="val">{{ total_weighed }}</div>
+        <div class="lbl">Tổng con đã cân (distinct)</div>
+      </div>
+      <div class="stat-card">
+        <div class="val">{{ n_age_groups }}</div>
+        <div class="lbl">Lứa tuổi theo dõi</div>
+      </div>
+      <div class="stat-card">
+        <div class="val">{{ threshold_pct }}%</div>
+        <div class="lbl">Ngưỡng tối thiểu (tuần {{ week_of_month }})</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- COVERAGE TABLE -->
+  <div class="section">
+    <h2>📊 Tỷ lệ coverage theo lứa tuổi</h2>
+    <table>
+      <thead>
+        <tr>
+          <th>Lứa tuổi</th>
+          <th>Cần cân (đầu tháng)</th>
+          <th>Đã cân (distinct)</th>
+          <th>Coverage</th>
+          <th>Trạng thái</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for g in age_groups %}
+        <tr>
+          <td><strong>{{ g.label }}</strong></td>
+          <td>{{ g.baseline_count }}</td>
+          <td>{{ g.weighed_count }}</td>
+          <td>
+            <div class="bar-wrap">
+              <div class="bar-bg">
+                <div class="bar-fill {{ 'bar-ok' if g.flag_ok else ('bar-warn' if g.coverage_pct >= threshold_pct * 0.5 else 'bar-bad') }}"
+                     style="width: {{ [g.coverage_pct, 100] | min | int }}%">
+                </div>
+              </div>
+              <span class="pct-label {{ 'ok' if g.flag_ok else 'warn' }}">
+                {{ "%.1f"|format(g.coverage_pct) }}%
+              </span>
+            </div>
+          </td>
+          <td>
+            {% if g.flag_ok %}
+              <span class="badge badge-ok">✅ Đạt</span>
+            {% else %}
+              <span class="badge badge-warn">⚠️ Chưa đạt</span>
+            {% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  <!-- AVG WEIGHT -->
+  <div class="section">
+    <h2>⚖️ Trung bình cân nặng (đã loại outlier)</h2>
+    <div class="avg-grid">
+      {% for g in age_groups %}
+      <div class="avg-card">
+        <div class="age-label">{{ g.label }}</div>
+        {% if g.avg_weight is not none %}
+          <div class="avg-val">{{ "%.1f"|format(g.avg_weight) }} kg</div>
+          <div class="avg-sub">n = {{ g.n_valid }} con &nbsp;·&nbsp; range {{ g.outlier_low }}–{{ g.outlier_high }} kg</div>
+        {% else %}
+          <div class="avg-val" style="color:#aaa;">—</div>
+          <div class="avg-sub">Không có dữ liệu hợp lệ</div>
+        {% endif %}
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+
+  <!-- WARNING BANNER (chỉ hiện nếu có group chưa đạt) -->
+  {% if has_warning %}
+  <div class="section">
+    <div class="warning-banner">
+      ⚠️&nbsp; <strong>Cần ưu tiên cân:</strong>
+      {% for g in warning_groups %}
+        <strong>{{ g }}</strong>{% if not loop.last %}, {% endif %}
+      {% endfor %}
+      — Tỷ lệ hiện tại chưa đạt ngưỡng {{ threshold_pct }}% của tuần {{ week_of_month }}.
+    </div>
+  </div>
+  {% endif %}
+
+  <!-- FOOTER -->
+  <div class="footer">
+    Báo cáo tự động · PYHTF Data System &nbsp;|&nbsp;
+    Generated: {{ generated_at }}
+  </div>
+
+</div>
+</body>
+</html>
