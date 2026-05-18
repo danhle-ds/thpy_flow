@@ -1,7 +1,7 @@
 # api_weight
 
-ETL pipeline scraping body weight data từ MyPTM (Cima1, Cima2) và Gallagher AMC (Gallagher_1).
-Merge với Total Herd data, lưu Parquet, gửi báo cáo Telegram (daily) và Outlook (weekly).
+ETL pipeline scraping body weight từ MyPTM (Cima1, Cima2) và Gallagher AMC.
+Merge với Total Herd, lưu Parquet, gửi báo cáo Telegram (daily) và Outlook (weekly).
 
 ---
 
@@ -10,90 +10,140 @@ Merge với Total Herd data, lưu Parquet, gửi báo cáo Telegram (daily) và 
 ```
 api_weight/
 ├── main.py                          # Entry point
+├── run.bat                          # Shortcut Windows / Task Scheduler
 ├── config/
-│   ├── paths.py                     # Tất cả Path objects (load từ path.env)
-│   └── settings.py                  # Constants nghiệp vụ (không có credentials)
+│   ├── paths.py                     # Path objects (từ path.env, tự override khi dev)
+│   └── settings.py                  # Constants + RUN_MODE
 ├── core/
 │   ├── ingest/
-│   │   ├── ptm_collector.py         # MyPTM API: login + fetch Cima1/Cima2
-│   │   └── gallagher_collector.py   # Gallagher AMC API: PKCE OAuth + incremental fetch
+│   │   ├── ptm_collector.py         # MyPTM API: login + fetch (retry)
+│   │   └── gallagher_collector.py   # Gallagher AMC: PKCE OAuth + incremental (retry)
 │   ├── transform/
-│   │   ├── structural/
-│   │   │   └── parser.py            # Parse raw PTM blob → DataFrame
+│   │   ├── structural/parser.py     # Parse raw PTM blob → DataFrame
 │   │   ├── business/
 │   │   │   ├── cleaner.py           # Clean EarTag
 │   │   │   ├── herd_loader.py       # Load Total Herd (XLS today → parquet fallback)
 │   │   │   ├── herd_merger.py       # Merge weight ↔ herd, adjust Age/DIM
 │   │   │   └── classifier.py        # Phân loại Bò sữa / Bò tơ theo group_name
-│   │   └── dtype.py                 # Standardize schema, cast types, reorder cols
+│   │   └── dtype.py                 # Standardize schema, cast, reorder cols
 │   └── load/
 │       ├── atomic.py                # tmp→rename, backup, purge backup cũ
 │       ├── raw_writer.py            # Ghi raw CSV per device
-│       ├── parquet_writer.py        # Append + dedup → weight_db_api.parquet
+│       ├── parquet_writer.py        # Append + dedup → parquet
 │       └── csv_exporter.py          # Export CSV từ parquet
 ├── job/
-│   ├── ptm_weight.py                # Job PTM (Cima1 + Cima2)
+│   ├── ptm_weight.py                # Job PTM
 │   ├── gallagher_weight.py          # Job Gallagher
 │   ├── daily_report.py              # Báo cáo ngày → Telegram
 │   ├── weekly_report.py             # Báo cáo tuần → Outlook HTML
-│   └── templates/
-│       └── weekly_report.html       # Jinja2 template email
-└── utils/
-    ├── logger.py                    # CSV logger mỗi lần chạy
-    ├── qc_check.py                  # Validate data
-    ├── telegram_utils.py            # Gửi ảnh/text Telegram
-    └── outlook_utils.py             # Gửi email HTML Outlook
+│   └── templates/weekly_report.html # Jinja2 template email
+├── utils/
+│   ├── logger.py                    # CSV logger mỗi lần chạy
+│   ├── console.py                   # vprint() — verbose chỉ khi non-production
+│   ├── health_check.py              # Pre-run checks (env, API, parquet)
+│   ├── schema_loader.py             # Load herd_col_schema.xlsx (cached)
+│   ├── qc_check.py                  # Validate data
+│   ├── telegram_utils.py            # Gửi Telegram
+│   └── outlook_utils.py             # Gửi email HTML Outlook
+└── dev/
+    ├── dev.env                      # Env cho chế độ dev/dry_run
+    ├── debug/
+    │   ├── debug_ingest.py          # Kiểm tra API connection, xem raw response
+    │   ├── debug_transform.py       # Chạy pipeline, snapshot từng bước
+    │   └── debug_report.py          # Render chart + HTML không gửi
+    └── tests/
+        ├── conftest.py              # pytest fixtures (inline, không cần file thật)
+        ├── test_parser.py
+        ├── test_cleaner.py
+        ├── test_classifier.py
+        ├── test_merger.py
+        └── test_dtype.py
 ```
 
 ---
 
 ## Setup
 
-### 1. Cài thư viện
-
 ```bash
 pip install -r requirements.txt
+pip install pytest   # cho tests
 ```
 
-### 2. Tạo file env
+Tạo `D:\PYTHON_TOOLS\env\account.env` và `telegram_token.env` từ `env.example`.
 
-Copy `env.example` → `D:\PYTHON_TOOLS\env\account.env` và điền thông tin thực:
+---
 
-```
-PTM_USERNAME=...
-PTM_PASSWORD=...
-GALLAGHER_FARM_ID=...
-GALLAGHER_USERNAME=...
-GALLAGHER_PASSWORD=...
-TELEGRAM_BOT_TOKEN=...
-TELEGRAM_CHAT_ID_3=...
-MAIL_SEND=......
-MAIL_TO=...
-MAIL_CC=...
-ALERT_MAIL_TO=...........
-```
-
-`path.env` đặt tại `LOCAL\path.env` (xem mẫu trong env.example).
-
-### 3. Chạy
+## Chạy
 
 ```bash
+# Production
 python main.py
+# hoặc dùng bat
+run.bat
+
+# Dev mode (dùng D:\DATABASE\DEV_ENV, verbose print bật)
+$env:RUN_MODE="dev"; python main.py
+run.bat dev
+
+# Dry run (full pipeline, không ghi file, không gửi)
+$env:RUN_MODE="dry_run"; python main.py
+run.bat dry_run
 ```
 
 ---
 
-## Đường dẫn dữ liệu
+## RUN_MODE
 
-| Loại | Đường dẫn |
-|------|-----------|
-| Raw CSV per device | `` |
-| CSV cleaned (source 1) | `` |
-| CSV legacy (source 2) | `` |
-| **Parquet master** | `` |
-| Total Herd parquet | `` |
-| Temp chart | `` (xóa sau gửi) |
-| Log | `` |
+| Mode | Ghi file | Gửi Telegram/email | Verbose print | Paths |
+|------|----------|--------------------|---------------|-------|
+| `production` | ✅ | ✅ | ❌ (chỉ log CSV) | Production |
+| `dev` | ✅ | ✅ | ✅ | `DEV_ENV` |
+| `dry_run` | ❌ | ❌ | ✅ | Production paths (không ghi) |
+
+---
+
+## Debug (không cần data thật cho tests)
+
+```bash
+# Kiểm tra API connection
+$env:RUN_MODE="dev"; python dev/debug/debug_ingest.py
+
+# Xem pipeline transform step-by-step
+$env:RUN_MODE="dry_run"; python dev/debug/debug_transform.py
+
+# Render chart + HTML email, lưu vào dev/debug/_output/
+$env:RUN_MODE="dry_run"; python dev/debug/debug_report.py
+```
+
+---
+
+## Tests
+
+```bash
+# Chạy tất cả tests từ project root
+pytest dev/tests/ -v
+
+# Chạy test cụ thể
+pytest dev/tests/test_parser.py -v
+pytest dev/tests/test_classifier.py -v
+```
+
+Tests chạy **offline hoàn toàn** — không cần API, không cần file env thật, không cần parquet.
+
+---
+
+## Đường dẫn
+
+| Loại | Key trong path.env |
+|------|-------------------|
+| Raw CSV per device | `DATA_LAKE_RAW` / HERD_INFO / API_WEIGHT / {DEVICE} |
+| CSV cleaned | `DATA_LAKE_CSV` / HERD_INFO / API_WEIGHT |
+| Parquet master | `DATA_MARK` / HERD_INFO / API_WEIGHT / weight_db_api.parquet |
+| Total Herd parquet | `DATA_MARK` / INFO_HERD / total_herd.parquet |
+| Schema reference | `D:\PYTHON_TOOLS\env\herd_col_schema.xlsx` |
+| Log | `D:\Log\api_weight_run_log.csv` |
+
+Credentials và email → `account.env` | Telegram → `telegram_token.env` (không commit).
 
 ---
 
@@ -107,45 +157,28 @@ python main.py
 | `time` | str | HH:MM |
 | `no` | str | Cow ID từ herd |
 | `ear_tag` | str | RFID cleaned |
-| `group_name` | str | Từ herd merge |
-| `group_feed` | str | Từ herd merge |
+| `group_name` | str | Từ herd |
+| `group_feed` | str | Từ herd |
 | `cattle_type` | str | milking_cow / heifer / other |
 | `weight_kg` | float32 | |
-| `age_month` | float32 | Từ age_month_fix (herd DB) hoặc computed |
-| `age_days` | Int16 | Đã adjust về ngày cân |
-| `dim` | Int16 | Đã adjust về ngày cân |
+| `age_month` | float32 | Từ age_month_fix hoặc computed |
+| `age_days` | Int16 | Adjusted về ngày cân |
+| `dim` | Int16 | Adjusted về ngày cân |
 | `lac_no` | Int8 | |
-| `loaded_at` | str | Timestamp lúc load |
+| `loaded_at` | str | Timestamp load |
 
-**Dedup key:** `[date, ear_tag, device]` — keep last (bản có `loaded_at` lớn nhất)
-
----
-
-## Phân loại Bò sữa / Bò tơ
-
-Dựa trên `group_name` sau khi merge herd (không phụ thuộc vào device):
-
-| Loại | Điều kiện |
-|------|-----------|
-| `milking_cow` | group_name startswith `M`, `C`, hoặc `HOS` |
-| `heifer` | group_name match `H[1-8]` |
-| `other` | còn lại |
+**Dedup key:** `[date, ear_tag, device]` — sort `loaded_at` asc → keep last
 
 ---
 
-## Weekly Report — Coverage threshold
+## Git
 
-| Tuần trong tháng | Ngưỡng tối thiểu |
-|-----------------|-----------------|
-| Tuần 1 (ngày 1–7) | 10% |
-| Tuần 2 (ngày 8–14) | 20% |
-| Tuần 3+ (ngày 15+) | 30% |
+```bash
+# Update thường ngày
+cd D:\PYTHON_TOOLS\project\info_herd\api_weight
+git add .
+git commit -m "fix: mô tả thay đổi"
+git push
+```
 
----
-
-## Git & Security
-
-- **KHÔNG commit**: `*.env`, `gallagher_tokens.json`, `*.parquet`, `*.csv`, `*.png`
-- Xem `.gitignore` để biết đầy đủ danh sách
-- Mọi credentials đặt trong `account.env` (không commit)
-- Paths đặt trong `path.env` (không commit)
+Không commit: `*.env`, `*.parquet`, `*.csv`, `gallagher_tokens.json`, `dev/debug/_output/`

@@ -8,12 +8,18 @@ import os
 from pathlib import Path
 from dotenv import load_dotenv
 
-# ── Load path.env ──────────────────────────────────────────────────────────────
-_PATH_ENV = Path(r"D:\PYTHON_TOOLS\env\path.env")
-load_dotenv(_PATH_ENV, override=True)
+# ── Load env files ────────────────────────────────────────────────────────────
+_ENV_DIR = Path(r"D:\PYTHON_TOOLS\env")
 
-_ACCOUNT_ENV = Path(r"D:\PYTHON_TOOLS\env\account.env")
-load_dotenv(_ACCOUNT_ENV, override=True)
+for _env_file in [
+    _ENV_DIR / "path.env",
+    _ENV_DIR / "account.env",
+    _ENV_DIR / "telegram_token.env",
+]:
+    if _env_file.exists():
+        load_dotenv(_env_file, override=True)
+    else:
+        print(f"⚠️  Không tìm thấy: {_env_file}")
 
 
 def _e(key: str) -> str:
@@ -51,6 +57,9 @@ TOTAL_HERD_XLS_DIR = (
     / _FARM_REPORT / _TOTAL_HERD_SUB
 )
 
+# ── Schema reference ──────────────────────────────────────────────────────────
+HERD_COL_SCHEMA = _ENV_DIR / "herd_col_schema.xlsx"
+
 # ── Raw CSV per device ────────────────────────────────────────────────────────
 def raw_device_dir(device: str) -> Path:
     """D:/DATABASE/DATA_LAKE/RAW/HERD_INFO/API_WEIGHT/{DEVICE}/"""
@@ -63,7 +72,7 @@ CSV_CLEANED_DIR = DATA_LAKE_CSV / DEPT_NAME / JOB_NAME
 CSV_LEGACY_DIR = Path(r"D:\CLEANED_DATA\NUTRITION\WEIGHT")
 
 # ── Gallagher token cache ─────────────────────────────────────────────────────
-GALLAGHER_TOKEN_FILE = Path(r"D:\PYTHON_TOOLS\cache\gallagher_tokens.json")
+GALLAGHER_TOKEN_FILE = _ENV_DIR / "cache" / "gallagher_tokens.json"
 GALLAGHER_STATE_FILE = DATA_LAKE_RAW / DEPT_NAME / JOB_NAME / "GALLAGHER_1" / "_session_state.json"
 
 # ── Temp chart folder ─────────────────────────────────────────────────────────
