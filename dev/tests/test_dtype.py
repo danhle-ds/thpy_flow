@@ -18,7 +18,6 @@ def _input_df() -> pd.DataFrame:
         "no":         ["1001"],
         "ear_tag":    ["64001234"],
         "group_name": ["M1"],
-        "group_feed": ["F1"],
         "cattle_type":["milking_cow"],
         "weight":     [500.0],          # rename → weight_kg
         "age_month":  [24.0],

@@ -22,7 +22,7 @@ def merge_with_herd(
     # ── Không có herd → trả về weight_df với cột herd = null ──────────────────
     if herd_df is None:
         print("   ⚠️  Không có herd data → bỏ qua merge, các cột herd sẽ là null")
-        for c in ["no", "group_name", "group_feed", "age_days",
+        for c in ["no", "group_name", "age_days",
                   "age_month", "dim", "lac_no"]:
             weight_df[c] = None
         return weight_df
@@ -40,7 +40,7 @@ def merge_with_herd(
     df["_date_parsed"] = pd.to_datetime(df["date"], format="%Y-%m-%d", errors="coerce")
 
     # ── Cột cần lấy từ herd ───────────────────────────────────────────────────
-    herd_cols = ["no", "transp_2", "group_name", "group_feed",
+    herd_cols = ["no", "transp_2", "group_name",
                  "age_days", "age_month_fix", "dim", "lac_no"]
     herd_sub  = herd_df[[c for c in herd_cols if c in herd_df.columns]].copy()
 

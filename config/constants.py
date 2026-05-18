@@ -28,7 +28,7 @@ PARQUET_COL_ORDER = [
     "source", "device",
     "date", "time",
     "no", "ear_tag",
-    "group_name", "group_feed", "cattle_type",
+    "group_name", "cattle_type",
     "weight_kg",
     "age_month", "age_days",
     "dim", "lac_no",

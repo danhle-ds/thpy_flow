@@ -2,8 +2,8 @@
 dev/migrate_historical.py
 Chuyển đổi CSV historic sang parquet chuẩn schema mới.
 
-Input : D:\CLEANED_DATA\NUTRITION\WEIGHT\DATA_MERGE_COW_ID.csv
-Output: D:\DATABASE\DATA_WARE_HOUSE\DATA_MARK_THPY\HERD_INFO\API_WEIGHT\weight_db_api.parquet
+Input : D:/CLEANED_DATA/NUTRITION/WEIGHT/DATA_MERGE_COW_ID.csv
+Output: D:/DATABASE/DATA_WARE_HOUSE/DATA_MARK_THPY/HERD_INFO/API_WEIGHT/weight_db_api.parquet
 
 Chạy 1 lần duy nhất để khởi tạo parquet ban đầu.
 Sau đó pipeline mới cứ append vào như bình thường.
@@ -98,10 +98,6 @@ def migrate():
         df["source"] = df["device"].apply(_infer_source)
         print(f"➕ source: {df['source'].value_counts().to_dict()}")
 
-    # group_feed — không có trong CSV cũ → null
-    if "group_feed" not in df.columns:
-        df["group_feed"] = pd.NA
-        print("➕ group_feed: null (không có trong CSV cũ)")
 
     # cattle_type — derive từ group_name
     if "cattle_type" not in df.columns and "group_name" in df.columns:

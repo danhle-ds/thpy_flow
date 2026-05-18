@@ -22,7 +22,7 @@ from utils.schema_loader import get_xls_to_snake, get_col_mapping, get_strip_dot
 # ── Cột cần thiết để merge ────────────────────────────────────────────────────
 _MERGE_COLS = [
     "no", "transp_2",
-    "group_name", "group_feed",
+    "group_name",
     "age_days", "age_month_fix",
     "dim", "lac_no",
 ]

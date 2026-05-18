@@ -26,7 +26,7 @@ def _herd_df(snapshot_date: str = "2024-05-03") -> pd.DataFrame:
         "no":            ["1001", "1002"],
         "transp_2":      ["AAA111", "BBB222"],
         "group_name":    ["M1", "H3"],
-        "group_feed":    ["F1", "F2"],
+        
         "age_days":      [732, 272],     # tính tại ngày snapshot
         "age_month_fix": [24.0, 9.0],
         "dim":           [47, None],
