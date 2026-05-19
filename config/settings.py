@@ -10,7 +10,6 @@ import os as _os
 from config.constants import (   # noqa: F401
     PTM_BASE_URL, PTM_LOGIN_URL, PTM_DATA_URL, PTM_DEVICES,
     GALLAGHER_BASE, GALLAGHER_AUTH_URL,
-    MILKING_COW_PREFIXES, HEIFER_PATTERN,
     PARQUET_COL_ORDER, DEDUP_KEYS,
     AGE_GROUPS, coverage_threshold, week_of_month,
 )

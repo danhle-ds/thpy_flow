@@ -4,6 +4,7 @@ Pure business constants — không đổi theo môi trường, không đọc env
 Các giá trị operational (toggles, thresholds) để ở settings.py.
 """
 from __future__ import annotations
+import re
 
 # ── PTM API ───────────────────────────────────────────────────────────────────
 PTM_BASE_URL  = "http://myptmapp.com"
@@ -20,8 +21,16 @@ GALLAGHER_BASE     = "https://am.app.gallagher.com/amc/api"
 GALLAGHER_AUTH_URL = "https://auth.gallagher.com/auth/realms/gallagher/protocol/openid-connect"
 
 # ── Cattle classifier ─────────────────────────────────────────────────────────
-MILKING_COW_PREFIXES = ("M", "C", "HOS")   # startswith, case-insensitive
-HEIFER_PATTERN       = r"^H[1-8]"           # regex
+MILKING_PREFIXES = ("M", "C", "HOS")   # startswith, case-insensitive
+DRY_PREFIXES         = ("DR","T")
+HEIFER_PREFIXES = (
+    "H",
+    "N",
+    "CV",
+    "R",
+)
+
+HEIFER_PATTERN = re.compile(r"\bH[1-8]\b")
 
 # ── Parquet schema — thứ tự cột chuẩn ────────────────────────────────────────
 PARQUET_COL_ORDER = [

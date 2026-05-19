@@ -8,24 +8,51 @@ import re
 
 import pandas as pd
 
-from config.settings import MILKING_COW_PREFIXES, HEIFER_PATTERN
+from config.constants import MILKING_PREFIXES, DRY_PREFIXES, HEIFER_PREFIXES, HEIFER_PATTERN
 
-_HEIFER_RE = re.compile(HEIFER_PATTERN, re.IGNORECASE)
 
+def _normalize_group_name(group_name: str) -> str:
+    """
+    Normalize:
+    - upper
+    - replace special chars -> space
+    - collapse multiple spaces
+    """
+    g = str(group_name).upper()
+    g = re.sub(r"[^A-Z0-9]+", " ", g)
+    g = " ".join(g.split())
+
+    return g
 
 def classify_one(group_name) -> str:
-    """
-    Bò sữa : group_name startswith M*, C*, HOS*  (case-insensitive)
-    Bò tơ  : group_name match H[1-8]
-    Khác   : 'other'
-    """
-    if pd.isna(group_name) or not str(group_name).strip():
+    if pd.isna(group_name):
         return "other"
-    g = str(group_name).strip()
-    if any(g.upper().startswith(p.upper()) for p in MILKING_COW_PREFIXES):
+
+    g = _normalize_group_name(group_name)
+
+    if not g:
+        return "other"
+
+    prefix = g.split()[0]
+
+    # PRIORITY 1: DRY
+    if prefix.startswith(DRY_PREFIXES):
+        return "dry"
+
+    # PRIORITY 2: MILKING
+    if (
+        prefix.startswith(MILKING_PREFIXES)
+        or re.search(r"C\d", prefix)
+    ):
         return "milking_cow"
-    if _HEIFER_RE.match(g):
+
+    # PRIORITY 3: HEIFER
+    if (
+        prefix.startswith(HEIFER_PREFIXES)
+        or HEIFER_PATTERN.search(g)
+    ):
         return "heifer"
+
     return "other"
 
 
