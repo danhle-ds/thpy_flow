@@ -31,6 +31,7 @@ import job.gallagher_weight as gallagher_weight_job
 import job.daily_report     as daily_report_job
 import job.weekly_report    as weekly_report_job
 
+from core.load.csv_exporter import export_csv_from_parquet
 from config.paths import WEIGHT_PARQUET
 from config.settings import NO_DATA_ALERT_DAYS
 from utils.outlook_utils import send_html_email
@@ -103,6 +104,18 @@ def main() -> None:
         except Exception as e:
             print(f"\n❌ weekly_report lỗi: {e}")
             results["weekly_report"] = {"status": "failed", "error": str(e)}
+
+    # ── Export CSV (job nào completed thì mới chạy xuất csv) ───────────────────────────────────
+    _any_completed = any(
+        r.get("status") == "completed"
+        for r in results.values()
+    )
+    if _any_completed:
+        try:
+            print("\n── Export CSV ────────────────────────────────────────────")
+            export_csv_from_parquet()
+        except Exception as e:
+            print(f"\n⚠️  CSV export lỗi: {e}")
 
     # ── No-data alert ─────────────────────────────────────────────────────────
     try:

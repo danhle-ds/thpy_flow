@@ -8,7 +8,6 @@ import time
 from config.paths import raw_device_dir
 from config.settings import IS_DRY_RUN, DEVICE_ENABLED
 from core.ingest.gallagher_collector import collect_new_sessions
-from core.load.csv_exporter import export_csv_from_parquet
 from core.load.parquet_writer import append_and_dedup
 from core.transform.business.classifier import add_animal_type
 from core.transform.business.cleaner import clean_ear_tag
@@ -17,7 +16,7 @@ from core.transform.business.herd_merger import merge_with_herd
 from core.transform.dtype import standardize_schema
 from utils.logger import log
 from utils.console import vprint
-from utils.qc_check import check_not_empty, check_herd_join_rate
+from utils.qc_check import check_not_empty, check_herd_join_rate, filter_weight_range
 import utils.telegram_utils as tg
 
 JOB_NAME    = "gallagher_weight"
@@ -56,8 +55,8 @@ def run() -> dict:
 
     df_combined = add_animal_type(df_combined)
     df_final    = standardize_schema(df_combined)
+    df_final    = filter_weight_range(df_final, context="Gallagher")
     df_master   = append_and_dedup(df_final)
-    export_csv_from_parquet()
 
     dur = round(time.time() - t0, 2)
     log(JOB_NAME, DEVICE_NAME, "completed", dur,

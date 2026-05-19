@@ -29,7 +29,7 @@ JOB_NAME   = "daily_report"
 _HEIFER_RE = re.compile(HEIFER_PATTERN, re.IGNORECASE)
 
 
-def _classify(group_name) -> str:
+def classify_one(group_name) -> str:
     if pd.isna(group_name) or not str(group_name).strip():
         return "other"
     g = str(group_name).strip()
@@ -52,7 +52,7 @@ def _load_today(today_str: str) -> pd.DataFrame | None:
 
 
 def _build_chart(df: pd.DataFrame, today_str: str) -> Path:
-    df["_type"] = df["group_name"].apply(_classify)
+    df["_type"] = df["group_name"].apply(classify_one)
     df_milk = df[df["_type"] == "milking_cow"]
     df_heif = df[df["_type"] == "heifer"]
 
@@ -123,7 +123,7 @@ def _build_chart(df: pd.DataFrame, today_str: str) -> Path:
 
 
 def _build_caption(df: pd.DataFrame, today_str: str) -> str:
-    df["_type"] = df["group_name"].apply(_classify)
+    df["_type"] = df["group_name"].apply(classify_one)
     milk_cnt  = int((df["_type"] == "milking_cow").sum())
     heif_cnt  = int((df["_type"] == "heifer").sum())
     other_cnt = int((df["_type"] == "other").sum())

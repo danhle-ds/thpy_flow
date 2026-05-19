@@ -56,7 +56,12 @@ def _login() -> dict:
                 "code_challenge": challenge, "code_challenge_method": "S256"},
         allow_redirects=True,
     )
-    action_url = re.search(r'action="([^"]+)"', r1.text).group(1).replace("&amp;", "&")
+    m = re.search(r'action="([^"]+)"', r1.text)
+    if not m:
+        raise RuntimeError("Không tìm được action URL trong login page")
+    action_url = m.group(1).replace("&amp;", "&")
+
+    #action_url = re.search(r'action="([^"]+)"', r1.text).group(1).replace("&amp;", "&") legacy code
     r2 = sess.post(action_url, data={"username": _USERNAME, "password": _PASSWORD},
                    allow_redirects=False)
     code = re.search(r"code=([^&]+)", r2.headers.get("location", "")).group(1)
@@ -180,6 +185,14 @@ def _safe_name(name: str) -> str:
 
 
 # ── Public ────────────────────────────────────────────────────────────────────
+#Helped fuction
+def _parse_sid(s: dict) -> int | None:
+    try:
+        return int(s["href"].split("/")[-1])
+    except (KeyError, ValueError, IndexError):
+        return None
+
+
 def collect_new_sessions(raw_dir) -> tuple[pd.DataFrame | None, int]:
     from pathlib import Path
     raw_dir = Path(raw_dir)
@@ -189,7 +202,11 @@ def collect_new_sessions(raw_dir) -> tuple[pd.DataFrame | None, int]:
     saved_ids    = set(state["sessions"].keys())
     all_sessions = _fetch_session_list()
     new_sessions = [s for s in all_sessions
-                    if str(int(s["href"].split("/")[-1])) not in saved_ids]
+                if (sid := _parse_sid(s)) is not None
+                and str(sid) not in saved_ids]
+
+    #new_sessions = [s for s in all_sessions
+    #                if str(int(s["href"].split("/")[-1])) not in saved_ids] legacy code
 
     vprint(f"Gallagher: {len(all_sessions)} sessions | "
            f"Đã có: {len(saved_ids)} | Mới: {len(new_sessions)}")

@@ -19,7 +19,7 @@ class TestCleanEarTag:
 
     def test_strips_dot_zero(self):
         df = clean_ear_tag(_df(["607300.0"]))
-        assert df["ear_tag"].iloc[0] == "6073"   # strip .0 then lstrip 0
+        assert df["ear_tag"].iloc[0] == "607300"   # strip .0 then lstrip 0
 
     def test_removes_empty_string(self):
         df = clean_ear_tag(_df(["", "64001234"]))

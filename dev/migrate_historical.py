@@ -28,6 +28,7 @@ import pandas as pd
 
 from config.paths import WEIGHT_PARQUET
 from config.settings import PARQUET_COL_ORDER, MILKING_COW_PREFIXES, HEIFER_PATTERN
+from core.transform.business.classifier import classify_one
 
 # ── Paths ─────────────────────────────────────────────────────────────────────
 SRC_CSV = Path(r"D:\CLEANED_DATA\NUTRITION\WEIGHT\DATA_MERGE_COW_ID.csv")
@@ -41,17 +42,6 @@ def _infer_source(device: str) -> str:
     if "GALLAGHER" in d:
         return "GALLAGHER"
     return "PTM"   # CIMA1, CIMA2 → PTM
-
-
-def _classify(group_name) -> str:
-    if pd.isna(group_name) or not str(group_name).strip():
-        return "other"
-    g = str(group_name).strip()
-    if any(g.upper().startswith(p.upper()) for p in MILKING_COW_PREFIXES):
-        return "milking_cow"
-    if _HEIFER_RE.match(g):
-        return "heifer"
-    return "other"
 
 
 def _normalize_id(s: pd.Series) -> pd.Series:
@@ -101,7 +91,7 @@ def migrate():
 
     # animal_type — derive từ group_name
     if "animal_type" not in df.columns and "group_name" in df.columns:
-        df["animal_type"] = df["group_name"].apply(_classify)
+        df["animal_type"] = df["group_name"].apply(classify_one)
         print(f"➕ animal_type: {df['animal_type'].value_counts().to_dict()}")
 
     # loaded_at — dùng timestamp migration

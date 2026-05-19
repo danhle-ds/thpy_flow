@@ -7,6 +7,7 @@ from __future__ import annotations
 import os
 from pathlib import Path
 from dotenv import load_dotenv
+from config.settings import RUN_MODE
 
 # ── Load env files ────────────────────────────────────────────────────────────
 _ENV_DIR = Path(r"D:\PYTHON_TOOLS\env")
@@ -42,10 +43,9 @@ def _detect_username() -> str:
 
 
 # ── Roots từ path.env ─────────────────────────────────────────────────────────
-_RUN_MODE = os.getenv("RUN_MODE", "production")
 LOCAL_OUT_DIR = (
     Path(r"D:\DATABASE\DEV_ENV")
-    if _RUN_MODE == "dev"
+    if RUN_MODE == "dev"
     else Path(_e("LOCAL_OUT_DIR"))
 )
 

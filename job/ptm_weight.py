@@ -21,7 +21,6 @@ from config.settings import (
 )
 from config.paths import raw_device_dir
 from core.ingest.ptm_collector import collect_all
-from core.load.csv_exporter import export_csv_from_parquet
 from core.load.parquet_writer import append_and_dedup
 from core.load.raw_writer import save_raw
 from core.transform.business.classifier import add_animal_type
@@ -32,7 +31,7 @@ from core.transform.dtype import standardize_schema
 from core.transform.structural.parser import parse_ptm_df
 from utils.logger import log
 from utils.console import vprint
-from utils.qc_check import check_not_empty, check_herd_join_rate
+from utils.qc_check import check_not_empty, check_herd_join_rate, filter_weight_range
 import utils.telegram_utils as tg
 
 JOB_NAME = "ptm_weight"
@@ -62,8 +61,9 @@ def _active_ptm_devices() -> dict[str, str]:
 # ── Raw parse only mode ───────────────────────────────────────────────────────
 def _load_raw_from_disk(date_from: str, date_to: str) -> dict[str, pd.DataFrame]:
     """
-    Đọc raw CSV đã lưu trên disk thay vì gọi API.
-    Lọc theo date_from → date_to.
+    Đọc toàn bộ raw CSV từ disk (không filter theo date — date filter
+    xảy ra sau parse vì date nằm trong blob text).
+    date_from / date_to giữ lại để caller biết intent, filter ở run().
     """
     result: dict[str, pd.DataFrame] = {}
     for device_name in _active_ptm_devices():
@@ -85,6 +85,13 @@ def _load_raw_from_disk(date_from: str, date_to: str) -> dict[str, pd.DataFrame]
             continue
 
         combined = pd.concat(frames, ignore_index=True)
+        if RAW_PARSE_ONLY:
+            mask   = (df_all["date"] >= date_from) & (df_all["date"] <= date_to)
+            before = len(df_all)
+            df_all = df_all[mask].copy()
+            vprint(f"   RAW_PARSE_ONLY filter: {before:,} → {len(df_all):,} dòng ({date_from} → {date_to})")
+
+        vprint(f"   ✅ Tổng sau parse: {len(df_all):,} dòng")
         vprint(f"   📂 {device_name}: {len(combined):,} records từ disk")
         result[device_name] = combined
 
@@ -163,10 +170,10 @@ def run() -> dict:
     # ── Step 7–8: Classify + Standardize ─────────────────────────────────────
     df_all   = add_animal_type(df_all)
     df_final = standardize_schema(df_all)
+    df_final = filter_weight_range(df_final, context="PTM")
 
-    # ── Step 9–10: Parquet + CSV ──────────────────────────────────────────────
+    # ── Step 9–10: Parquet ──────────────────────────────────────────────
     df_master = append_and_dedup(df_final)
-    export_csv_from_parquet()
 
     # ── Done ──────────────────────────────────────────────────────────────────
     dur = round(time.time() - t0, 2)
