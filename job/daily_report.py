@@ -24,20 +24,10 @@ from config.settings import MILKING_COW_PREFIXES, HEIFER_PATTERN, IS_DRY_RUN
 from utils.logger import log
 from utils.console import vprint
 import utils.telegram_utils as tg
+from core.transform.business.classifier import classify_one
 
 JOB_NAME   = "daily_report"
 _HEIFER_RE = re.compile(HEIFER_PATTERN, re.IGNORECASE)
-
-
-def classify_one(group_name) -> str:
-    if pd.isna(group_name) or not str(group_name).strip():
-        return "other"
-    g = str(group_name).strip()
-    if any(g.upper().startswith(p.upper()) for p in MILKING_COW_PREFIXES):
-        return "milking_cow"
-    if _HEIFER_RE.match(g):
-        return "heifer"
-    return "other"
 
 
 def _load_today(today_str: str) -> pd.DataFrame | None:

@@ -55,7 +55,7 @@ def _check_no_data_alert() -> None:
 
     print(f"\n🚨 ALERT: Không có data mới trong {gap} ngày (cuối: {latest})")
     import os
-    alert_to = os.getenv("ALERT_MAIL_TO", "danh.ln@thmilk.vn")
+    alert_to = os.getenv("ALERT_MAIL")
     html = (f"<h2>🚨 Cảnh báo: Không có dữ liệu cân bò</h2>"
             f"<p>Không có dữ liệu mới trong <strong>{gap} ngày</strong>.</p>"
             f"<p>Lần cuối: <strong>{latest}</strong> | Hôm nay: <strong>{date.today()}</strong></p>"

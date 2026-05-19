@@ -17,15 +17,14 @@ from config.constants import (   # noqa: F401
 
 # ── Run mode ──────────────────────────────────────────────────────────────────
 #SETTING_MODE
-DEFAULT_RUN_MODE = "production" # FIX MODE IS HERE
 
-RUN_MODE   = _os.getenv("RUN_MODE", DEFAULT_RUN_MODE)  # production | dev | dry_run
+RUN_MODE   = "production"  # production | dev | dry_run
 IS_PROD    = RUN_MODE == "production"
 IS_DEV     = RUN_MODE == "dev"
 IS_DRY_RUN = RUN_MODE == "dry_run"
 
 # ── Fetch window ──────────────────────────────────────────────────────────────
-N_DAY_RUNNING = int(_os.getenv("N_DAY_RUNNING", "7"))
+N_DAY_RUNNING = 7
 
 # ── Backfill: override date range qua env var hoặc set thẳng ─────────────────
 # Dùng khi cần chạy bù dữ liệu bị lỗi.
@@ -51,8 +50,8 @@ RAW_PARSE_ONLY = _bool_env("RAW_PARSE_ONLY", False)
 
 # ── QC thresholds ─────────────────────────────────────────────────────────────
 # Tỷ lệ match herd tối thiểu — dưới ngưỡng này sẽ raise email alert
-HERD_JOIN_ALERT_THRESHOLD = float(_os.getenv("HERD_JOIN_ALERT_THRESHOLD", "0.30"))
-HERD_JOIN_MIN_ROWS        = int(_os.getenv("HERD_JOIN_MIN_ROWS", "20"))
+HERD_JOIN_ALERT_THRESHOLD = 0.3
+HERD_JOIN_MIN_ROWS        = 20
 
 # ── Retention ─────────────────────────────────────────────────────────────────
 BACKUP_RETENTION_DAYS = 7

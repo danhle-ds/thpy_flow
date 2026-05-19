@@ -92,7 +92,7 @@ def _send_herd_join_alert(
     from datetime import date
     from utils.outlook_utils import send_html_email
 
-    alert_to = os.getenv("ALERT_MAIL_TO", "danh.ln@thmilk.vn")
+    alert_to = os.getenv("ALERT_MAIL")
     today    = date.today().strftime("%d/%m/%Y")
 
     html = f"""

@@ -24,7 +24,6 @@ BOT_TOKEN    = os.getenv("TELEGRAM_BOT_TOKEN_INFOR", "")
 CHAT_TESTING = os.getenv("TELEGRAM_CHAT_ID", "")       # Testing data
 CHAT_DAILY   = os.getenv("TELEGRAM_CHAT_ID_2", "")     # Daily report
 CHAT_INFO    = os.getenv("TELEGRAM_CHAT_ID_INFO", "")  # Info production
-CHAT_VET     = os.getenv("TELEGRAM_CHAT_ID_VET", "")   # Vet group
 
 
 # ── Core sender ───────────────────────────────────────────────────────────────

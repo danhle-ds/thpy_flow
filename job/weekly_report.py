@@ -187,9 +187,9 @@ def run() -> dict:
     today = date.today()
     print(f"\n{'─'*60}\n📧 Weekly Report | {today.strftime('%d/%m/%Y')}\n{'─'*60}")
 
-    mail_send = os.getenv("MAIL_SEND", "danh.ln@thmilk.vn")
-    mail_to   = [m.strip() for m in os.getenv("MAIL_TO", "").split(",") if m.strip()]
-    mail_cc   = [m.strip() for m in os.getenv("MAIL_CC", "").split(",") if m.strip()]
+    mail_send = os.getenv("MAIL_SEND")
+    mail_to   = [m.strip() for m in os.getenv("MAIL_TO_WEIGHT", "").split(",") if m.strip()]
+    mail_cc   = [m.strip() for m in os.getenv("MAIL_CC_WEIGHT", "").split(",") if m.strip()]
     subject   = (
         f"[PYHTF] Báo cáo cân bò tơ — "
         f"Tuần {week_of_month(today)} tháng {today.strftime('%m/%Y')}"
