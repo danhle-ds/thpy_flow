@@ -27,7 +27,7 @@ from datetime import datetime
 import pandas as pd
 
 from config.paths import WEIGHT_PARQUET
-from config.settings import PARQUET_COL_ORDER, MILKING_COW_PREFIXES, HEIFER_PATTERN
+from config.constants import PARQUET_COL_ORDER, MILKING_PREFIXES, HEIFER_PATTERN
 from core.transform.business.classifier import classify_one
 
 # ── Paths ─────────────────────────────────────────────────────────────────────

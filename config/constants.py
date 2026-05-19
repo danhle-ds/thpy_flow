@@ -20,17 +20,18 @@ PTM_DEVICES: dict[str, str] = {
 GALLAGHER_BASE     = "https://am.app.gallagher.com/amc/api"
 GALLAGHER_AUTH_URL = "https://auth.gallagher.com/auth/realms/gallagher/protocol/openid-connect"
 
-# ── Cattle classifier ─────────────────────────────────────────────────────────
-MILKING_PREFIXES = ("M", "C", "HOS")   # startswith, case-insensitive
-DRY_PREFIXES         = ("DR","T")
-HEIFER_PREFIXES = (
-    "H",
-    "N",
-    "CV",
-    "R",
-)
+# ── Cattle classifier — priority: DRY → HEIFER → MILKING ─────────────────────
+# DRY   : TM*, TD*, T2*, DR*, DRA*, DRYA*, "DR C8B", ...
+DRY_PREFIXES = ("DR", "T")
 
-HEIFER_PATTERN = re.compile(r"\bH[1-8]\b")
+# HEIFER: H[1-8]* hoặc H đứng một mình, CV*, R*, N*
+#         H9 / H0 không hợp lệ → "other"
+HEIFER_PATTERN = re.compile(r"^(H([1-8]|$)|CV|N|R)")
+
+# MILKING: M*, HOS*, C[1-8]*
+#          C[1-8] dùng regex riêng để tránh collision với CV* (heifer)
+MILKING_PREFIXES  = ("M", "HOS")
+MILKING_C_PATTERN = re.compile(r"^C[1-8]")
 
 # ── Parquet schema — thứ tự cột chuẩn ────────────────────────────────────────
 PARQUET_COL_ORDER = [

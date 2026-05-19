@@ -1,57 +1,50 @@
 """
 core/transform/business/classifier.py
-Phân loại Bò sữa / Bò tơ theo group_name (sau khi đã join herd).
+Phân loại bò theo group_name (sau khi đã join herd).
 Không dùng device để phân loại.
+
+Priority: DRY → HEIFER → MILKING
 """
 from __future__ import annotations
 import re
 
 import pandas as pd
 
-from config.constants import MILKING_PREFIXES, DRY_PREFIXES, HEIFER_PREFIXES, HEIFER_PATTERN
+from config.constants import (
+    DRY_PREFIXES,
+    HEIFER_PATTERN,
+    MILKING_PREFIXES,
+    MILKING_C_PATTERN,
+)
 
 
-def _normalize_group_name(group_name: str) -> str:
-    """
-    Normalize:
-    - upper
-    - replace special chars -> space
-    - collapse multiple spaces
-    """
-    g = str(group_name).upper()
-    g = re.sub(r"[^A-Z0-9]+", " ", g)
-    g = " ".join(g.split())
+def _normalize(group_name: str) -> str:
+    """Upper, thay special chars → space, collapse spaces."""
+    g = re.sub(r"[^A-Z0-9]+", " ", str(group_name).upper())
+    return " ".join(g.split())
 
-    return g
 
 def classify_one(group_name) -> str:
     if pd.isna(group_name):
         return "other"
 
-    g = _normalize_group_name(group_name)
-
+    g = _normalize(group_name)
     if not g:
         return "other"
 
     prefix = g.split()[0]
 
-    # PRIORITY 1: DRY
+    # ── Priority 1: DRY — DR*, T* ─────────────────────────────────────────────
     if prefix.startswith(DRY_PREFIXES):
         return "dry"
 
-    # PRIORITY 2: MILKING
-    if (
-        prefix.startswith(MILKING_PREFIXES)
-        or re.search(r"C\d", prefix)
-    ):
-        return "milking_cow"
-
-    # PRIORITY 3: HEIFER
-    if (
-        prefix.startswith(HEIFER_PREFIXES)
-        or HEIFER_PATTERN.search(g)
-    ):
+    # ── Priority 2: HEIFER — H[1-8]*, H, CV*, N*, R* ─────────────────────────
+    if HEIFER_PATTERN.match(prefix):
         return "heifer"
+
+    # ── Priority 3: MILKING — M*, HOS*, C[1-8]* ──────────────────────────────
+    if prefix.startswith(MILKING_PREFIXES) or MILKING_C_PATTERN.match(prefix):
+        return "milking_cow"
 
     return "other"
 
