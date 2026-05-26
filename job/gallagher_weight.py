@@ -7,6 +7,7 @@ from __future__ import annotations
 import time
 
 from config.paths import raw_device_dir
+from config.constants import GALLAGHER_DEVICE
 from config.settings import IS_DRY_RUN, DEVICE_ENABLED, DOWNLOAD_ONLY
 from core.ingest.gallagher_collector import collect_new_sessions
 from core.load.raw_gallagher_writer import get_downloaded_ids
@@ -23,14 +24,13 @@ from utils.qc_check import check_not_empty, check_herd_join_rate, filter_weight_
 import utils.telegram_utils as tg
 
 JOB_NAME    = "gallagher_weight"
-DEVICE_NAME = "GALLAGHER_1"
 
 
 def run() -> dict:
     # ── Guard: device bị tắt ──────────────────────────────────────────────────
-    if not DEVICE_ENABLED.get(DEVICE_NAME, True):
-        print(f"\n⏭️  {DEVICE_NAME} disabled → bỏ qua")
-        log(JOB_NAME, DEVICE_NAME, "no_new_data", 0, "Device disabled")
+    if not DEVICE_ENABLED.get(GALLAGHER_DEVICE, True):
+        print(f"\n⏭️  {GALLAGHER_DEVICE} disabled → bỏ qua")
+        log(JOB_NAME, GALLAGHER_DEVICE, "no_new_data", 0, "Device disabled")
         return {"status": "no_new_data", "reason": "device disabled"}
 
     t0 = time.time()
@@ -44,7 +44,7 @@ def run() -> dict:
 
     if not new_sessions:
         dur = round(time.time() - t0, 2)
-        log(JOB_NAME, DEVICE_NAME, "no_new_data", dur, "Không có session mới")
+        log(JOB_NAME, GALLAGHER_DEVICE, "no_new_data", dur, "Không có session mới")
         return {"status": "no_new_data", "n_new_sessions": 0}
 
     # ── Step 2: Ghi raw CSV + update state ───────────────────────────────────
@@ -53,7 +53,7 @@ def run() -> dict:
 
     if combined is None or combined.empty:
         dur = round(time.time() - t0, 2)
-        log(JOB_NAME, DEVICE_NAME, "no_new_data", dur,
+        log(JOB_NAME, GALLAGHER_DEVICE, "no_new_data", dur,
             f"Fetch {len(new_sessions)} sessions nhưng 0 animals")
         return {"status": "no_new_data", "n_new_sessions": len(new_sessions)}
 
@@ -63,7 +63,7 @@ def run() -> dict:
     if DOWNLOAD_ONLY:
         dur = round(time.time() - t0, 2)
         print(f"\n⏹️  DOWNLOAD_ONLY: đã lưu raw | {n_written} sessions | {len(combined):,} animals | {dur}s")
-        log(JOB_NAME, DEVICE_NAME, "completed", dur,
+        log(JOB_NAME, GALLAGHER_DEVICE, "completed", dur,
             f"download_only | sessions={n_written} | animals={len(combined)}")
         return {"status": "completed", "mode": "download_only",
                 "n_sessions": n_written, "animals": len(combined)}
@@ -72,7 +72,7 @@ def run() -> dict:
     combined = clean_ear_tag(combined)
     if not check_not_empty(combined, "Gallagher clean"):
         dur = round(time.time() - t0, 2)
-        log(JOB_NAME, DEVICE_NAME, "failed", dur, "Empty sau clean_ear_tag")
+        log(JOB_NAME, GALLAGHER_DEVICE, "failed", dur, "Empty sau clean_ear_tag")
         return {"status": "failed"}
 
     herd_df, herd_source = load_herd()
@@ -86,7 +86,7 @@ def run() -> dict:
 
     # ── Done ──────────────────────────────────────────────────────────────────
     dur = round(time.time() - t0, 2)
-    log(JOB_NAME, DEVICE_NAME, "completed", dur,
+    log(JOB_NAME, GALLAGHER_DEVICE, "completed", dur,
         f"sessions={len(new_sessions)} | herd={herd_source} | "
         f"new={len(df_final)} | master={len(df_master)}")
 

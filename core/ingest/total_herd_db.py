@@ -11,23 +11,13 @@ import duckdb
 import pandas as pd
 
 from config.paths import TOTAL_HERD_PARQUET
+from utils.id_utils import normalize_id
 
 # ── Cột cần trả về ────────────────────────────────────────────────────────────
 _MERGE_COLS = ["no", "transp_2", "group_name",
                "age_days", "age_month_fix", "dim", "lac_no"]
 
 
-# ── Normalize helpers ─────────────────────────────────────────────────────────
-def _normalize_id(s: pd.Series) -> pd.Series:
-    """Đồng bộ với total_herd_xls._normalize_id."""
-    return (
-        s.astype("string")
-        .str.strip()
-        .str.replace(r"\.0$", "", regex=True)
-        .str.replace(r"^(\d+\.\d+)[eE][+\-]\d+$",
-                     lambda m: str(int(float(m.group(0)))), regex=True)
-        .str.lstrip("0")
-    )
 
 
 # ── Public ────────────────────────────────────────────────────────────────────
@@ -90,9 +80,9 @@ def load(snapshot_date: str | None = None) -> pd.DataFrame | None:
 
         # ── Normalize ─────────────────────────────────────────────────────────
         if "transp_2" in df.columns:
-            df["transp_2"] = _normalize_id(df["transp_2"])
+            df["transp_2"] = normalize_id(df["transp_2"])
         if "no" in df.columns:
-            df["no"] = _normalize_id(df["no"])
+            df["no"] = normalize_id(df["no"])
 
         print(f"   ✅ DB loaded: snapshot {target_date} | {len(df):,} rows")
         return df

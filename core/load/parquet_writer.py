@@ -11,7 +11,8 @@ import duckdb
 import pandas as pd
 
 from config.paths import WEIGHT_PARQUET
-from config.settings import DEDUP_KEYS, IS_DRY_RUN
+from config.constants import DEDUP_KEYS
+from config.settings import IS_DRY_RUN
 from core.load.atomic import atomic_write_parquet, make_backup, purge_old_backups
 from utils.console import vprint
 

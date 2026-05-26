@@ -20,6 +20,7 @@ from pathlib import Path
 import pandas as pd
 
 from config.paths import TOTAL_HERD_XLS_DIR
+from utils.id_utils import normalize_id
 from utils.schema_loader import get_col_mapping, get_strip_dot_zero_cols, get_xls_to_snake
 
 # ── Cột cần trả về ────────────────────────────────────────────────────────────
@@ -27,23 +28,6 @@ _MERGE_COLS = ["no", "transp_2", "group_name",
                "age_days", "age_month_fix", "dim", "lac_no"]
 
 
-# ── Normalize helpers ─────────────────────────────────────────────────────────
-def _normalize_id(s: pd.Series) -> pd.Series:
-    """
-    Chuẩn hóa cột ID: ép string, strip '.0' suffix, bỏ leading zeros.
-    Xử lý đủ 3 dạng Excel trả về:
-      "0982091074767472"     → string, leading zero
-      "982091074767528.0"    → float string, .0 suffix
-      "9.82091074767472e+14" → scientific notation (Number cell)
-    """
-    return (
-        s.astype("string")
-        .str.strip()
-        .str.replace(r"\.0$", "", regex=True)          # "982...528.0" → "982...528"
-        .str.replace(r"^(\d+\.\d+)[eE][+\-]\d+$",     # scientific → decimal string
-                     lambda m: str(int(float(m.group(0)))), regex=True)
-        .str.lstrip("0")
-    )
 
 
 # ── Tìm file XLS hôm nay ─────────────────────────────────────────────────────
@@ -80,7 +64,7 @@ def load_xls(path: Path) -> pd.DataFrame | None:
         # ── Step 2: Strip .0 cho cột ID trước khi đổi tên ────────────────────
         for raw_col in get_strip_dot_zero_cols():   # ["No.", "Sire #", "Dam #", ...]
             if raw_col in df.columns:
-                df[raw_col] = _normalize_id(df[raw_col])
+                df[raw_col] = normalize_id(df[raw_col])
 
         # ── Step 3: XLS header → snake_case ──────────────────────────────────
         xls_map = get_xls_to_snake()
@@ -88,13 +72,13 @@ def load_xls(path: Path) -> pd.DataFrame | None:
 
         # ── Step 4: Normalize transp_2 (cùng logic cleaner.py) ───────────────
         if "transp_2" in df.columns:
-            df["transp_2"] = _normalize_id(df["transp_2"])
+            df["transp_2"] = normalize_id(df["transp_2"])
         else:
             print(f"   ⚠️  XLS '{path.name}': không có cột transp_2 sau map")
 
         # ── Step 5: no normalize ──────────────────────────────────────────────
         if "no" in df.columns:
-            df["no"] = _normalize_id(df["no"])
+            df["no"] = normalize_id(df["no"])
 
         # ── Step 6: age_month_fix fallback ───────────────────────────────────
         if "age_month_fix" not in df.columns and "age_months_raw" in df.columns:

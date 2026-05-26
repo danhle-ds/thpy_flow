@@ -7,33 +7,9 @@ from datetime import date
 
 import pandas as pd
 
+from utils.id_utils import normalize_id
 
-# ── Normalize join key ────────────────────────────────────────────────────────
-def _normalize_join_key(s: pd.Series) -> pd.Series:
-    """
-    Chuan hoa cot ID truoc khi join: strip, bo '.0' suffix, bo leading zeros,
-    xu ly scientific notation cho so ID dai (>15 chu so).
 
-    Phai dong bo hoan toan voi total_herd_db._normalize_id va
-    total_herd_xls._normalize_id. Neu sua o day, sua ca 2 noi kia.
-
-    TODO: Extract ca 3 implementation nay ra utils/id_utils.py de dung chung.
-    Hien tai co 3 ban copy giong nhau — rui ro khi mot ban bi sua khong dong bo.
-    """
-    result = (
-        s.astype("string")
-        .str.strip()
-        .str.replace(r"\.0$", "", regex=True)
-        .str.replace(
-            r"^(\d+\.\d+)[eE][+\-]\d+$",
-            lambda m: str(int(float(m.group(0)))),
-            regex=True,
-        )
-        .str.lstrip("0")
-    )
-    # Cast ve object truoc merge: tranh edge case StringDtype vs object dtype
-    # trong mot so pandas versions khong match dung du gia tri giong nhau.
-    return result.astype(object)
 
 
 # ── Public ────────────────────────────────────────────────────────────────────
@@ -68,8 +44,8 @@ def merge_with_herd(
     # Normalize ca hai phia ve cung dang truoc khi join.
     # Herd side co the da duoc normalize boi ingest module, nhung ap dung lai
     # dam bao nhat quan khi XLS source khong normalize truoc.
-    df["ear_tag"]        = _normalize_join_key(df["ear_tag"])
-    herd_sub["transp_2"] = _normalize_join_key(herd_sub["transp_2"])
+    df["ear_tag"]        = normalize_id(df["ear_tag"])
+    herd_sub["transp_2"] = normalize_id(herd_sub["transp_2"])
 
     merged = df.merge(
         herd_sub, left_on="ear_tag", right_on="transp_2",

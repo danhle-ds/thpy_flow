@@ -19,6 +19,7 @@ PTM_DEVICES: dict[str, str] = {
 # ── Gallagher API ─────────────────────────────────────────────────────────────
 GALLAGHER_BASE     = "https://am.app.gallagher.com/amc/api"
 GALLAGHER_AUTH_URL = "https://auth.gallagher.com/auth/realms/gallagher/protocol/openid-connect"
+GALLAGHER_DEVICE   = "GALLAGHER_1"
 # ── Parquet schema — thứ tự cột chuẩn ────────────────────────────────────────
 PARQUET_COL_ORDER = [
     "source", "device",

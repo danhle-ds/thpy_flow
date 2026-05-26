@@ -11,7 +11,7 @@ from datetime import datetime
 
 import pandas as pd
 
-from config.settings import PARQUET_COL_ORDER
+from config.constants import PARQUET_COL_ORDER
 
 _STR_COLS = [
     "source", "device", "date", "time",

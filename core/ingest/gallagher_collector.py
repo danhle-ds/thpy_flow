@@ -8,21 +8,28 @@ Delete API  → expose fetch_all_sessions_stats() + delete_session() cho cleanup
 """
 from __future__ import annotations
 
-import base64, hashlib, json, os, re, secrets, time, requests
+import base64
+import hashlib
+import json
+import os
+import re
+import secrets
+import time
 from pathlib import Path
 
 import pandas as pd
+import requests
 from dotenv import load_dotenv
 
 from config.paths import GALLAGHER_TOKEN_FILE, GALLAGHER_STATE_FILE
-from config.settings import GALLAGHER_BASE, GALLAGHER_AUTH_URL
+from config.constants import GALLAGHER_BASE, GALLAGHER_AUTH_URL, GALLAGHER_DEVICE
+from utils.string_utils import safe_filename
 from utils.console import vprint
 
 load_dotenv(Path(r"D:\PYTHON_TOOLS\env\account.env"), override=True)
 _FARM_ID     = os.getenv("GALLAGHER_FARM_ID")
 _USERNAME    = os.getenv("GALLAGHER_USERNAME")
 _PASSWORD    = os.getenv("GALLAGHER_PASSWORD")
-_DEVICE_NAME = "GALLAGHER_1"
 
 
 # ── Retry helper ──────────────────────────────────────────────────────────────
@@ -204,8 +211,6 @@ def _session_to_df(session_id: int, data: dict) -> pd.DataFrame:
     ])
 
 
-def _safe_name(name: str) -> str:
-    return re.sub(r'[\\/:*?"<>|]', "_", name).strip()
 
 
 # ── Public: fetch new sessions (no file writes) ───────────────────────────────

@@ -27,6 +27,7 @@ from config.paths import raw_device_dir
 from config.settings import IS_DRY_RUN
 from core.load.atomic import atomic_write_csv
 from utils.console import vprint
+from utils.string_utils import safe_filename
 
 _DEDUP_KEY = "id"   # PTM record ID, globally unique per API row
 
@@ -54,7 +55,7 @@ def save_raw(df: pd.DataFrame, device: str) -> dict[str, int]:
     df_t2   = df[mask_t2]
 
     for op_tag, group in df_t2.groupby("operationTag", sort=False):
-        safe  = _safe_name(str(op_tag))
+        safe  = safe_filename(str(op_tag))
         fpath = out_dir / f"raw_{device}_{safe}"
         n     = _append_dedup(group, fpath)
         if n == len(group):
@@ -110,5 +111,5 @@ def _append_dedup(new_rows: pd.DataFrame, fpath: Path) -> int:
     return len(combined)
 
 
-def _safe_name(name: str) -> str:
+def safe_filename(name: str) -> str:
     return re.sub(r'[\\/:*?"<>|\s]', "_", name).strip("_")

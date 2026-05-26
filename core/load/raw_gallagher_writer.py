@@ -14,11 +14,12 @@ from pathlib import Path
 
 import pandas as pd
 
+from config.constants import GALLAGHER_DEVICE
 from config.paths import GALLAGHER_STATE_FILE, raw_device_dir
 from config.settings import IS_DRY_RUN
 from utils.console import vprint
+from utils.string_utils import safe_filename
 
-_DEVICE_NAME = "GALLAGHER_1"
 
 
 # ── State helpers ─────────────────────────────────────────────────────────────
@@ -46,7 +47,7 @@ def get_downloaded_ids(raw_dir: Path | None = None) -> set[int]:
     Scan raw_dir tìm file {session_id}_*.csv.
     Đây là ground truth cho cleanup: chỉ file thật sự tồn tại mới được tính là đã tải.
     """
-    target = raw_dir or raw_device_dir(_DEVICE_NAME)
+    target = raw_dir or raw_device_dir(GALLAGHER_DEVICE)
     if not target.exists():
         return set()
     ids: set[int] = set()
@@ -76,12 +77,12 @@ def write_sessions(
         (combined_df | None, n_written)
         combined_df đã có cột source + device.
     """
-    target = raw_dir or raw_device_dir(_DEVICE_NAME)
+    target = raw_dir or raw_device_dir(GALLAGHER_DEVICE)
 
     if IS_DRY_RUN:
         vprint(f"   🟡 DRY_RUN: skip ghi {len(new_sessions)} sessions")
         frames = [
-            df.assign(source="GALLAGHER", device=_DEVICE_NAME)
+            df.assign(source="GALLAGHER", device=GALLAGHER_DEVICE)
             for _, _, df in new_sessions
             if not df.empty
         ]
@@ -93,7 +94,7 @@ def write_sessions(
     n_written = 0
 
     for session_id, session_name, df in new_sessions:
-        safe = _safe_name(session_name)
+        safe = safe_filename(session_name)
         fpath = target / f"{session_id}_{safe}.csv"
 
         try:
@@ -106,13 +107,7 @@ def write_sessions(
             continue   # không register nếu ghi lỗi
 
         if not df.empty:
-            frames.append(df.assign(source="GALLAGHER", device=_DEVICE_NAME))
+            frames.append(df.assign(source="GALLAGHER", device=GALLAGHER_DEVICE))
 
     combined = pd.concat(frames, ignore_index=True) if frames else None
     return combined, n_written
-
-
-# ── Helpers ───────────────────────────────────────────────────────────────────
-def _safe_name(name: str) -> str:
-    import re
-    return re.sub(r'[\\/:*?"<>|]', "_", name).strip()

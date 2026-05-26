@@ -3,6 +3,10 @@ utils/qc_check.py
 Các hàm kiểm tra chất lượng dữ liệu — không mang logic nghiệp vụ chuyên môn.
 """
 from __future__ import annotations
+
+# Ngưỡng join rate — đặt ở đây vì chỉ dùng trong module này
+_HERD_JOIN_ALERT_THRESHOLD = 0.3
+_HERD_JOIN_MIN_ROWS        = 20
 import os
 import pandas as pd
 
@@ -35,8 +39,8 @@ def check_no_all_null(
 def filter_weight_range(
     df: pd.DataFrame,
     col: str = "weight_kg",
-    low: float = 50.0,
-    high: float = 1_000.0,
+    low: float = 60.0,
+    high: float = 900.0, # there's no HF cow can not reach 900kg. (MBW = 600-720)
     context: str = "",
 ) -> pd.DataFrame:
     if col not in df.columns:
@@ -55,18 +59,16 @@ def check_herd_join_rate(
 ) -> bool:
     """
     Kiểm tra tỷ lệ match herd (cột 'no' not null).
-    Nếu < HERD_JOIN_ALERT_THRESHOLD và đủ rows → gửi email alert + return False.
+    Nếu < _HERD_JOIN_ALERT_THRESHOLD và đủ rows → gửi email alert + return False.
     Return True = OK, False = cần chú ý (vẫn tiếp tục ghi, chỉ alert).
     """
-    from config.settings import HERD_JOIN_ALERT_THRESHOLD, HERD_JOIN_MIN_ROWS
-
-    if "no" not in df.columns or len(df) < HERD_JOIN_MIN_ROWS:
+    if "no" not in df.columns or len(df) < _HERD_JOIN_MIN_ROWS:
         return True
 
     matched   = int(df["no"].notna().sum())
     total     = len(df)
     rate      = matched / total
-    threshold = HERD_JOIN_ALERT_THRESHOLD
+    threshold = _HERD_JOIN_ALERT_THRESHOLD
 
     if rate >= threshold:
         print(f"   ✅ QC [{context}]: Herd join {matched}/{total} ({rate:.1%}) ≥ {threshold:.0%}")

@@ -12,7 +12,7 @@ import requests
 from dotenv import load_dotenv
 from pathlib import Path
 
-from config.settings import PTM_LOGIN_URL, PTM_DATA_URL, PTM_DEVICES
+from config.constants import PTM_LOGIN_URL, PTM_DATA_URL, PTM_DEVICES
 
 # ── Credentials từ account.env ────────────────────────────────────────────────
 load_dotenv(Path(r"D:\PYTHON_TOOLS\env\account.env"), override=True)
