@@ -39,4 +39,4 @@ def log(
     }
     with LOG_FILE.open("a", newline="", encoding="utf-8-sig") as f:
         csv.DictWriter(f, fieldnames=_COLS).writerow(row)
-    print(f"   📝 Log [{status}] {job_name}/{device}: {msg}")
+    print(f"   Log [{status}] {job_name}/{device}: {msg}")

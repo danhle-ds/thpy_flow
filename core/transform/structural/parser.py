@@ -77,5 +77,5 @@ def parse_ptm_df(raw_df: pd.DataFrame, device_name: str) -> pd.DataFrame | None:
     # ── Numeric ───────────────────────────────────────────────────────────────
     df["weight"] = pd.to_numeric(df["weight"], errors="coerce")
 
-    print(f"   🔧 {device_name}: {len(df):,} dòng sau parse")
+    print(f"   {device_name}: {len(df):,} dòng sau parse")
     return df

@@ -12,6 +12,7 @@ from config.constants import (   # noqa: F401
     GALLAGHER_BASE, GALLAGHER_AUTH_URL,
     PARQUET_COL_ORDER, DEDUP_KEYS,
     AGE_GROUPS, coverage_threshold, week_of_month,
+    GALLAGHER_ANIMAL_THRESHOLD,
 )
 
 # ── Run mode ──────────────────────────────────────────────────────────────────
@@ -46,6 +47,13 @@ DEVICE_ENABLED: dict[str, bool] = {
 # RAW_PARSE_ONLY = True: đọc raw CSV cũ từ DATA_LAKE/RAW/, không gọi API
 # Dùng khi cần reprocess dữ liệu đã có mà không tốn API call
 RAW_PARSE_ONLY = _bool_env("RAW_PARSE_ONLY", False)
+
+# DOWNLOAD_ONLY = True: chỉ tải API → lưu raw CSV → dừng.
+# Không transform, không ghi parquet, không gửi report.
+# Dùng cho lần đầu bootstrap khi chưa có raw file nào.
+# PowerShell: $env:DOWNLOAD_ONLY="true"; python main.py
+# Kết hợp date range PTM: $env:DATE_FROM="2024-01-01"; $env:DATE_TO="2024-12-31"; $env:DOWNLOAD_ONLY="true"; python main.py
+DOWNLOAD_ONLY = _bool_env("DOWNLOAD_ONLY", False)
 
 # ── QC thresholds ─────────────────────────────────────────────────────────────
 # Tỷ lệ match herd tối thiểu — dưới ngưỡng này sẽ raise email alert

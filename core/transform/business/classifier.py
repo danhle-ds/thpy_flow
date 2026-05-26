@@ -1,61 +1,42 @@
-"""
-core/transform/business/classifier.py
-Phân loại bò theo group_name (sau khi đã join herd).
-Không dùng device để phân loại.
-
-Priority: DRY → HEIFER → MILKING
-"""
 from __future__ import annotations
-import re
-
 import pandas as pd
+import numpy as np
 
-from config.constants import (
-    DRY_PREFIXES,
-    HEIFER_PATTERN,
-    MILKING_PREFIXES,
-    MILKING_C_PATTERN,
-)
-
-
-def _normalize(group_name: str) -> str:
-    """Upper, thay special chars → space, collapse spaces."""
-    g = re.sub(r"[^A-Z0-9]+", " ", str(group_name).upper())
-    return " ".join(g.split())
-
-
-def classify_one(group_name) -> str:
-    if pd.isna(group_name):
-        return "other"
-
-    g = _normalize(group_name)
-    if not g:
-        return "other"
-
-    prefix = g.split()[0]
-
-    # ── Priority 1: DRY — DR*, T* ─────────────────────────────────────────────
-    if prefix.startswith(DRY_PREFIXES):
-        return "dry"
-
-    # ── Priority 2: HEIFER — H[1-8]*, H, CV*, N*, R* ─────────────────────────
-    if HEIFER_PATTERN.match(prefix):
-        return "heifer"
-
-    # ── Priority 3: MILKING — M*, HOS*, C[1-8]* ──────────────────────────────
-    if prefix.startswith(MILKING_PREFIXES) or MILKING_C_PATTERN.match(prefix):
-        return "milking_cow"
-
-    return "other"
+def classify_by_lac_no(lac_no) -> str:
+    """Phân loại dựa trên số lứa đẻ (lac_no).
+    
+    - NaN/Null       -> 'unknown'
+    - lac_no >= 1    -> 'cow' (Bò đã đẻ)
+    - lac_no < 1     -> 'heifer' (Bò tơ chưa đẻ lứa nào, thường là 0)
+    """
+    # Kiểm tra nếu giá trị bị khuyết (NaN, None)
+    if pd.isna(lac_no):
+        return "unknown"
+    
+    try:
+        # Ép kiểu về dạng số để so sánh chính xác
+        lac_val = float(lac_no)
+        
+        if lac_val >= 1:
+            return "cow"
+        else:
+            return "heifer"
+            
+    except (ValueError, TypeError):
+        # Phòng trường hợp dữ liệu có chữ lạ không ép số được
+        return "unknown"
 
 
-def add_animal_type(df: pd.DataFrame, group_col: str = "group_name") -> pd.DataFrame:
-    """Thêm cột animal_type vào df."""
+def add_animal_type(df: pd.DataFrame, lac_col: str = "lac_no") -> pd.DataFrame:
+    """Thêm hoặc cập nhật cột animal_type vào df dựa trên lac_no."""
     df = df.copy()
-    df["animal_type"] = (
-        df[group_col].apply(classify_one) if group_col in df.columns
-        else "other"
-    )
+    
+    if lac_col in df.columns:
+        df["animal_type"] = df[lac_col].apply(classify_by_lac_no)
+    else:
+        # Nếu dataframe không có cột lac_no thì gán mặc định unknown
+        df["animal_type"] = "unknown"
+        
     counts = df["animal_type"].value_counts().to_dict()
-    print(f"   🏷️  Classify: {counts}")
+    print(f" 🏷️  Classify bằng lac_no: {counts}")
     return df

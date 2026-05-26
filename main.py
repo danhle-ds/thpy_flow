@@ -3,8 +3,7 @@ main.py — Entry point chính.
 Load env → health check → dispatch jobs → alert.
 """
 from __future__ import annotations
-import sys
-import time
+import sys, time
 from datetime import date
 from pathlib import Path
 from dotenv import load_dotenv
@@ -26,10 +25,12 @@ ensure_dirs()
 mode_banner()
 
 # ── Jobs ─────────────────────────────────────────────────────────────────────
-import job.ptm_weight       as ptm_weight_job
-import job.gallagher_weight as gallagher_weight_job
-import job.daily_report     as daily_report_job
-import job.weekly_report    as weekly_report_job
+import job.ptm_weight          as ptm_weight_job
+import job.gallagher_weight    as gallagher_weight_job
+import job.daily_report        as daily_report_job
+import job.weekly_report       as weekly_report_job
+import job.gallagher_cleanup   as gallagher_cleanup_job   # ← mới
+import job.monthly_report      as monthly_report_job      # ← mới
 
 from core.load.csv_exporter import export_csv_from_parquet
 from config.paths import WEIGHT_PARQUET
@@ -77,17 +78,17 @@ def main() -> None:
     print("=" * 60)
 
     # ── Health check ──────────────────────────────────────────────────────────
-    skip_api = IS_DRY_RUN   # dry_run có thể chạy offline
+    skip_api = IS_DRY_RUN
     if not run_health_check(skip_api=skip_api):
         print("\n❌ Health check FAIL — dừng pipeline")
         sys.exit(1)
 
     results: dict[str, dict] = {}
 
-    # ── Jobs ──────────────────────────────────────────────────────────────────
+    # ── Jobs chính ────────────────────────────────────────────────────────────
     for job_name, job_fn in [
-        ("ptm",       ptm_weight_job.run),
-        ("gallagher", gallagher_weight_job.run),
+        ("ptm",          ptm_weight_job.run),
+        ("gallagher",    gallagher_weight_job.run),
         ("daily_report", daily_report_job.run),
     ]:
         try:
@@ -95,6 +96,14 @@ def main() -> None:
         except Exception as e:
             print(f"\n❌ {job_name} lỗi: {e}")
             results[job_name] = {"status": "failed", "error": str(e)}
+
+    # ── Gallagher cleanup (sau khi fetch xong, mới an toàn xóa) ──────────────
+    # Chạy mỗi ngày — cleanup tự kiểm tra threshold, bỏ qua nếu chưa cần.
+    try:
+        results["gallagher_cleanup"] = gallagher_cleanup_job.run()
+    except Exception as e:
+        print(f"\n⚠️  gallagher_cleanup lỗi: {e}")
+        results["gallagher_cleanup"] = {"status": "failed", "error": str(e)}
 
     # ── Weekly (thứ 6) ────────────────────────────────────────────────────────
     if today.weekday() == 4:
@@ -105,7 +114,17 @@ def main() -> None:
             print(f"\n❌ weekly_report lỗi: {e}")
             results["weekly_report"] = {"status": "failed", "error": str(e)}
 
-    # ── Export CSV (job nào completed thì mới chạy xuất csv) ───────────────────────────────────
+    # ── Monthly (ngày cuối tháng) ─────────────────────────────────────────────
+    from job.monthly_report import is_last_day_of_month
+    if is_last_day_of_month(today):
+        print(f"\n📅 Cuối tháng → chạy Monthly Report")
+        try:
+            results["monthly_report"] = monthly_report_job.run()
+        except Exception as e:
+            print(f"\n❌ monthly_report lỗi: {e}")
+            results["monthly_report"] = {"status": "failed", "error": str(e)}
+
+    # ── Export CSV (chỉ khi có job nào completed) ─────────────────────────────
     _any_completed = any(
         r.get("status") == "completed"
         for r in results.values()
@@ -128,7 +147,8 @@ def main() -> None:
     print(f"\n{'='*60}\n✅ Hoàn tất | {dur}s | RUN_MODE={RUN_MODE}")
     for name, r in results.items():
         status = r.get("status", "unknown")
-        icon   = {"completed": "✅", "no_new_data": "⚠️ ", "failed": "❌"}.get(status, "⚪")
+        icon   = {"completed": "✅", "no_new_data": "⚠️ ", "no_action": "⏭️ ",
+                  "failed": "❌", "partial": "🟡"}.get(status, "⚪")
         print(f"   {icon} {name}: {status}")
     print("=" * 60)
 

@@ -9,7 +9,7 @@ Supports:
 """
 from __future__ import annotations
 import time
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta
 from pathlib import Path
 
 import pandas as pd
@@ -18,11 +18,12 @@ from config.settings import (
     N_DAY_RUNNING, PTM_DEVICES, IS_DRY_RUN,
     DATE_FROM_OVERRIDE, DATE_TO_OVERRIDE,
     DEVICE_ENABLED, RAW_PARSE_ONLY,
+    DOWNLOAD_ONLY
 )
 from config.paths import raw_device_dir
 from core.ingest.ptm_collector import collect_all
 from core.load.parquet_writer import append_and_dedup
-from core.load.raw_writer import save_raw
+from core.load.raw_ptm_writer import save_raw
 from core.transform.business.classifier import add_animal_type
 from core.transform.business.cleaner import clean_ear_tag
 from core.transform.business.herd_loader import load_herd
@@ -58,13 +59,45 @@ def _active_ptm_devices() -> dict[str, str]:
     }
 
 
+# ── Helpers: extract date từ tên file (không dùng mtime) ─────────────────────
+def _extract_date_from_filename(fname: str, device: str):
+    """
+    raw_CIMA1_012-12032024_00.csv → date(2024, 3, 12)
+    raw_CIMA1_direct_2024-02-24.csv → date(2024, 2, 24)
+    Trả về date object hoặc None nếu không parse được.
+    """
+    import re as _re
+    stem = fname.replace(f"raw_{device}_", "").replace(".csv", "")
+    # Type 1: direct_YYYY-MM-DD
+    m = _re.search(r"direct_(\d{4}-\d{2}-\d{2})", stem)
+    if m:
+        try:
+            return datetime.strptime(m.group(1), "%Y-%m-%d").date()
+        except ValueError:
+            return None
+    # Type 2: {seq}-{DD}{MM}{YYYY}_{seq}
+    m = _re.search(r"\d+-(\d{2})(\d{2})(\d{4})_\d+", stem)
+    if m:
+        try:
+            return datetime.strptime(
+                f"{m.group(1)}/{m.group(2)}/{m.group(3)}", "%d/%m/%Y"
+            ).date()
+        except ValueError:
+            return None
+    return None
+
+
 # ── Raw parse only mode ───────────────────────────────────────────────────────
 def _load_raw_from_disk(date_from: str, date_to: str) -> dict[str, pd.DataFrame]:
     """
-    Đọc toàn bộ raw CSV từ disk (không filter theo date — date filter
-    xảy ra sau parse vì date nằm trong blob text).
-    date_from / date_to giữ lại để caller biết intent, filter ở run().
+    Đọc raw CSV từ disk, filter theo date trong TÊN FILE — không dùng mtime.
+    Chỉ load file nằm trong khoảng [date_from, date_to] → nhanh hơn nhiều
+    khi có lịch sử dài.
+    Date filter sau parse (trên cột 'date') vẫn diễn ra trong run().
     """
+    d_from = datetime.strptime(date_from, "%Y-%m-%d").date()
+    d_to   = datetime.strptime(date_to,   "%Y-%m-%d").date()
+
     result: dict[str, pd.DataFrame] = {}
     for device_name in _active_ptm_devices():
         raw_dir = raw_device_dir(device_name)
@@ -72,8 +105,12 @@ def _load_raw_from_disk(date_from: str, date_to: str) -> dict[str, pd.DataFrame]
             vprint(f"   ⚠️  RAW dir không tồn tại: {raw_dir}")
             continue
 
-        frames = []
+        frames, skipped = [], 0
         for csv_path in sorted(raw_dir.glob("raw_*.csv")):
+            file_date = _extract_date_from_filename(csv_path.name, device_name)
+            if file_date is None or not (d_from <= file_date <= d_to):
+                skipped += 1
+                continue
             try:
                 df = pd.read_csv(csv_path, dtype=str)
                 frames.append(df)
@@ -81,18 +118,11 @@ def _load_raw_from_disk(date_from: str, date_to: str) -> dict[str, pd.DataFrame]
                 vprint(f"   ⚠️  Lỗi đọc {csv_path.name}: {e}")
 
         if not frames:
-            vprint(f"   ⚠️  Không có raw CSV: {device_name}")
+            vprint(f"   ⚠️  Không có raw CSV trong [{date_from} → {date_to}]: {device_name}")
             continue
 
         combined = pd.concat(frames, ignore_index=True)
-        if RAW_PARSE_ONLY:
-            mask   = (df_all["date"] >= date_from) & (df_all["date"] <= date_to)
-            before = len(df_all)
-            df_all = df_all[mask].copy()
-            vprint(f"   RAW_PARSE_ONLY filter: {before:,} → {len(df_all):,} dòng ({date_from} → {date_to})")
-
-        vprint(f"   ✅ Tổng sau parse: {len(df_all):,} dòng")
-        vprint(f"   📂 {device_name}: {len(combined):,} records từ disk")
+        vprint(f"   📂 {device_name}: {len(combined):,} records | skip {skipped} file ngoài range")
         result[device_name] = combined
 
     return result
@@ -133,6 +163,14 @@ def run() -> dict:
         vprint("\n── Save Raw ──────────────────────────────────────────────────")
         for dev, raw_df in raw_by_dev.items():
             save_raw(raw_df, dev)
+
+    if DOWNLOAD_ONLY:
+        dur = round(time.time() - t0, 2)
+        n_records = sum(len(df) for df in raw_by_dev.values())
+        print(f"\n⬇️  DOWNLOAD_ONLY: đã lưu raw | {n_records:,} records | {dur}s")
+        for dev in raw_by_dev:
+            log(JOB_NAME, dev, "completed", dur, f"download_only | records={len(raw_by_dev[dev])}")
+        return {"status": "completed", "mode": "download_only", "records": n_records}
 
     # ── Step 3: Parse ─────────────────────────────────────────────────────────
     vprint("\n── Parse PTM blobs ───────────────────────────────────────────────")

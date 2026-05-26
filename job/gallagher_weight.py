@@ -3,11 +3,14 @@ job/gallagher_weight.py
 Job scraping Gallagher AMC (GALLAGHER_1). Incremental.
 """
 from __future__ import annotations
+
 import time
 
 from config.paths import raw_device_dir
-from config.settings import IS_DRY_RUN, DEVICE_ENABLED
+from config.settings import IS_DRY_RUN, DEVICE_ENABLED, DOWNLOAD_ONLY
 from core.ingest.gallagher_collector import collect_new_sessions
+from core.load.raw_gallagher_writer import get_downloaded_ids
+from core.load.raw_gallagher_writer import write_sessions
 from core.load.parquet_writer import append_and_dedup
 from core.transform.business.classifier import add_animal_type
 from core.transform.business.cleaner import clean_ear_tag
@@ -33,47 +36,73 @@ def run() -> dict:
     t0 = time.time()
     print(f"\n{'─'*60}\n🐄 Gallagher Weight Job\n{'─'*60}")
 
-    raw_dir            = raw_device_dir(DEVICE_NAME)
-    df_combined, n_new = collect_new_sessions(raw_dir)
+    # ── Step 1: Lấy saved IDs + fetch sessions mới ───────────────────────────
+    # Dung disk scan lam ground truth, khong dung state file
+    # State file co the out-of-sync neu session da registered nhung CSV bi xoa
+    saved_ids = {str(i) for i in get_downloaded_ids()}
+    new_sessions = collect_new_sessions(saved_ids)   # [(sid, name, df), ...]
 
-    if df_combined is None or df_combined.empty:
+    if not new_sessions:
         dur = round(time.time() - t0, 2)
-        log(JOB_NAME, DEVICE_NAME, "no_new_data", dur, f"Không có session mới ({n_new} scanned)")
-        return {"status": "no_new_data", "n_new_sessions": n_new}
+        log(JOB_NAME, DEVICE_NAME, "no_new_data", dur, "Không có session mới")
+        return {"status": "no_new_data", "n_new_sessions": 0}
 
-    vprint(f"   ✅ {n_new} session mới | {len(df_combined):,} animals")
+    # ── Step 2: Ghi raw CSV + update state ───────────────────────────────────
+    vprint("\n── Save Raw Gallagher ────────────────────────────────────────")
+    combined, n_written = write_sessions(new_sessions)
 
-    df_combined = clean_ear_tag(df_combined)
-    if not check_not_empty(df_combined, "Gallagher clean"):
+    if combined is None or combined.empty:
+        dur = round(time.time() - t0, 2)
+        log(JOB_NAME, DEVICE_NAME, "no_new_data", dur,
+            f"Fetch {len(new_sessions)} sessions nhưng 0 animals")
+        return {"status": "no_new_data", "n_new_sessions": len(new_sessions)}
+
+    vprint(f"   ✅ {n_written} sessions ghi xong | {len(combined):,} animals")
+
+    # ── DOWNLOAD_ONLY: dừng sau khi lưu raw ───────────────────────────────────
+    if DOWNLOAD_ONLY:
+        dur = round(time.time() - t0, 2)
+        print(f"\n⏹️  DOWNLOAD_ONLY: đã lưu raw | {n_written} sessions | {len(combined):,} animals | {dur}s")
+        log(JOB_NAME, DEVICE_NAME, "completed", dur,
+            f"download_only | sessions={n_written} | animals={len(combined)}")
+        return {"status": "completed", "mode": "download_only",
+                "n_sessions": n_written, "animals": len(combined)}
+
+    # ── Step 3–7: Transform pipeline (giống ptm_weight) ──────────────────────
+    combined = clean_ear_tag(combined)
+    if not check_not_empty(combined, "Gallagher clean"):
         dur = round(time.time() - t0, 2)
         log(JOB_NAME, DEVICE_NAME, "failed", dur, "Empty sau clean_ear_tag")
         return {"status": "failed"}
 
     herd_df, herd_source = load_herd()
-    df_combined = merge_with_herd(df_combined, herd_df)
-    check_herd_join_rate(df_combined, job_name=JOB_NAME, context="Gallagher herd join")
+    combined = merge_with_herd(combined, herd_df)
+    check_herd_join_rate(combined, job_name=JOB_NAME, context="Gallagher herd join")
 
-    df_combined = add_animal_type(df_combined)
-    df_final    = standardize_schema(df_combined)
-    df_final    = filter_weight_range(df_final, context="Gallagher")
-    df_master   = append_and_dedup(df_final)
+    combined  = add_animal_type(combined)
+    df_final  = standardize_schema(combined)
+    df_final  = filter_weight_range(df_final, context="Gallagher")
+    df_master = append_and_dedup(df_final)
 
+    # ── Done ──────────────────────────────────────────────────────────────────
     dur = round(time.time() - t0, 2)
     log(JOB_NAME, DEVICE_NAME, "completed", dur,
-        f"sessions={n_new} | herd={herd_source} | new={len(df_final)} | master={len(df_master)}")
+        f"sessions={len(new_sessions)} | herd={herd_source} | "
+        f"new={len(df_final)} | master={len(df_master)}")
 
     if not IS_DRY_RUN and tg.BOT_TOKEN and tg.CHAT_INFO:
         tg.send_telegram_message(
             tg.CHAT_INFO,
             f"✅ <b>gallagher_weight</b> hoàn tất\n"
-            f"• Sessions: {n_new} | Animals: {len(df_final):,}\n"
+            f"• Sessions: {len(new_sessions)} | Animals: {len(df_final):,}\n"
             f"• Master: {len(df_master):,} | {dur}s",
         )
 
     print(f"\n✅ Gallagher done | {len(df_final):,} | master: {len(df_master):,} | {dur}s")
     return {
-        "status": "completed",
-        "n_new_sessions": n_new,
-        "rows_new": len(df_final),
-        "rows_master": len(df_master),
+        "status":        "completed",
+        "n_new_sessions": len(new_sessions),
+        "n_written":     n_written,
+        "rows_new":      len(df_final),
+        "rows_master":   len(df_master),
     }

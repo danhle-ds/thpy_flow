@@ -1,12 +1,12 @@
 """
 dev/migrate_historical.py
-Chuyển đổi CSV historic sang parquet chuẩn schema mới.
+Chuyen doi CSV historic sang parquet chuan schema moi.
 
-Input : D:/CLEANED_DATA/NUTRITION/WEIGHT/DATA_MERGE_COW_ID.csv
-Output: D:/DATABASE/DATA_WARE_HOUSE/DATA_MARK_THPY/HERD_INFO/API_WEIGHT/weight_db_api.parquet
+Input : CSV_LEGACY_DIR / DATA_MERGE_COW_ID.csv  (env var CSV_LEGACY_DIR)
+Output: WEIGHT_PARQUET (config/paths.py)
 
-Chạy 1 lần duy nhất để khởi tạo parquet ban đầu.
-Sau đó pipeline mới cứ append vào như bình thường.
+Chay 1 lan duy nhat de khoi tao parquet ban dau.
+Sau do pipeline moi cu append vao nhu binh thuong.
 
 Usage:
   python dev/migrate_historical.py
@@ -19,29 +19,27 @@ import os
 os.environ.setdefault("RUN_MODE", "production")
 
 from dotenv import load_dotenv
-load_dotenv(Path(r"D:\PYTHON_TOOLS\env\path.env"), override=True)
 
-import re
+# Bootstrap: load path.env de config/paths.py khoi tao duoc
+_ENV_DIR = Path(os.getenv("PYTHON_TOOLS_ENV", r"D:\PYTHON_TOOLS\env"))
+load_dotenv(_ENV_DIR / "path.env", override=True)
+
 from datetime import datetime
 
 import pandas as pd
 
-from config.paths import WEIGHT_PARQUET
-from config.constants import PARQUET_COL_ORDER, MILKING_PREFIXES, HEIFER_PATTERN
-from core.transform.business.classifier import classify_one
+from config.paths import WEIGHT_PARQUET, CSV_LEGACY_DIR
+from config.constants import PARQUET_COL_ORDER
+from core.transform.business.classifier import classify_by_lac_no
 
-# ── Paths ─────────────────────────────────────────────────────────────────────
-SRC_CSV = Path(r"D:\CLEANED_DATA\NUTRITION\WEIGHT\DATA_MERGE_COW_ID.csv")
-
-_HEIFER_RE = re.compile(HEIFER_PATTERN, re.IGNORECASE)
+SRC_CSV = CSV_LEGACY_DIR / "DATA_MERGE_COW_ID.csv"
 
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
 def _infer_source(device: str) -> str:
-    d = str(device).upper()
-    if "GALLAGHER" in d:
+    if "GALLAGHER" in str(device).upper():
         return "GALLAGHER"
-    return "PTM"   # CIMA1, CIMA2 → PTM
+    return "PTM"
 
 
 def _normalize_id(s: pd.Series) -> pd.Series:
@@ -55,83 +53,72 @@ def _normalize_id(s: pd.Series) -> pd.Series:
 # ── Migration ─────────────────────────────────────────────────────────────────
 def migrate():
     print("=" * 55)
-    print("🔄 Migrate historical CSV → weight_db_api.parquet")
+    print("Migrate historical CSV -> weight_db_api.parquet")
     print("=" * 55)
 
-    # ── Load CSV ──────────────────────────────────────────────────────────────
     if not SRC_CSV.exists():
-        print(f"❌ Không tìm thấy: {SRC_CSV}")
+        print(f"ERROR: Khong tim thay: {SRC_CSV}")
         sys.exit(1)
 
     df = pd.read_csv(SRC_CSV, dtype=str, encoding="utf-8-sig")
     df.columns = df.columns.str.strip()
-    print(f"\n✅ Đọc CSV: {len(df):,} dòng | cols: {list(df.columns)}")
+    print(f"\nDoc CSV: {len(df):,} dong | cols: {list(df.columns)}")
 
-    # ── Rename ────────────────────────────────────────────────────────────────
     rename_map = {
         "cow_id":       "no",
         "age_months":   "age_month",
         "lactation_no": "lac_no",
     }
     df = df.rename(columns={k: v for k, v in rename_map.items() if k in df.columns})
-    print(f"\n📝 Rename: {rename_map}")
 
-    # ── Drop raw cols ─────────────────────────────────────────────────────────
     drop_cols = ["operationTag", "raw_line", "STT"]
     dropped   = [c for c in drop_cols if c in df.columns]
-    df = df.drop(columns=dropped, errors="ignore")
-    print(f"🗑️  Drop: {dropped}")
+    df        = df.drop(columns=dropped, errors="ignore")
+    if dropped:
+        print(f"Drop cols: {dropped}")
 
-    # ── Thêm cột mới ──────────────────────────────────────────────────────────
-    # source — infer từ device
     if "source" not in df.columns and "device" in df.columns:
         df["source"] = df["device"].apply(_infer_source)
-        print(f"➕ source: {df['source'].value_counts().to_dict()}")
 
+    # Phan loai dua tren lac_no (khong dung group_name nua).
+    # Du lieu cu co the chua co lac_no — khi do classify ra "unknown".
+    # Neu muon giu lai gia tri animal_type cu, bo dong nay di.
+    if "lac_no" in df.columns:
+        lac_numeric = pd.to_numeric(df["lac_no"], errors="coerce")
+        df["animal_type"] = lac_numeric.apply(classify_by_lac_no)
+    else:
+        df["animal_type"] = "unknown"
+    print(f"animal_type: {df['animal_type'].value_counts().to_dict()}")
 
-    # animal_type — derive từ group_name
-    if "animal_type" not in df.columns and "group_name" in df.columns:
-        df["animal_type"] = df["group_name"].apply(classify_one)
-        print(f"➕ animal_type: {df['animal_type'].value_counts().to_dict()}")
-
-    # loaded_at — dùng timestamp migration
     df["loaded_at"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
-    # ── Normalize ID cols ─────────────────────────────────────────────────────
     for col in ["no", "ear_tag"]:
         if col in df.columns:
             df[col] = _normalize_id(df[col])
 
-    # ── Cast dtypes ───────────────────────────────────────────────────────────
-    df["weight_kg"]  = pd.to_numeric(df.get("weight_kg"),  errors="coerce").astype("float32")
-    df["age_month"]  = pd.to_numeric(df.get("age_month"),  errors="coerce").astype("float32")
-    df["age_days"]   = pd.to_numeric(df.get("age_days"),   errors="coerce").astype("Int16")
-    df["dim"]        = pd.to_numeric(df.get("dim"),        errors="coerce").astype("Int16")
-    df["lac_no"]     = pd.to_numeric(df.get("lac_no"),     errors="coerce").astype("Int8")
+    df["weight_kg"] = pd.to_numeric(df.get("weight_kg"), errors="coerce").astype("float32")
+    df["age_month"] = pd.to_numeric(df.get("age_month"), errors="coerce").astype("float32")
+    df["age_days"]  = pd.to_numeric(df.get("age_days"),  errors="coerce").astype("Int16")
+    df["dim"]       = pd.to_numeric(df.get("dim"),       errors="coerce").astype("Int16")
+    df["lac_no"]    = pd.to_numeric(df.get("lac_no"),    errors="coerce").astype("Int8")
 
-    # ── Reorder cols ──────────────────────────────────────────────────────────
     ordered = [c for c in PARQUET_COL_ORDER if c in df.columns]
     extra   = [c for c in df.columns if c not in ordered]
     if extra:
-        print(f"⚠️  Cột không trong schema chuẩn (giữ lại cuối): {extra}")
+        print(f"WARNING: Cot ngoai schema (giu lai cuoi): {extra}")
     df = df[ordered + extra]
 
-    # ── Summary trước khi ghi ─────────────────────────────────────────────────
-    print(f"\n📊 Schema sau migrate:")
-    print(df.dtypes.to_string())
-    print(f"\n   Null counts:")
+    print(f"\nSchema sau migrate:\n{df.dtypes.to_string()}")
     nulls = df.isnull().sum()
-    print(nulls[nulls > 0].to_string() if nulls.any() else "   (không có null)")
+    print(f"\nNull counts:\n{nulls[nulls > 0].to_string() if nulls.any() else '(khong co null)'}")
 
-    # ── Guard: parquet đã tồn tại? ────────────────────────────────────────────
     if WEIGHT_PARQUET.exists():
-        print(f"\n⚠️  Parquet đã tồn tại: {WEIGHT_PARQUET}")
-        ans = input("   Ghi đè? (yes/no): ").strip().lower()
+        print(f"\nWARNING: Parquet da ton tai: {WEIGHT_PARQUET}")
+        ans = input("   Ghi de? (yes/no): ").strip().lower()
         if ans != "yes":
-            print("   Hủy — không ghi đè")
+            print("   Huy — khong ghi de")
             sys.exit(0)
 
-    # ── Ghi parquet ───────────────────────────────────────────────────────────
     WEIGHT_PARQUET.parent.mkdir(parents=True, exist_ok=True)
     tmp = WEIGHT_PARQUET.with_suffix(".tmp.parquet")
     try:
@@ -140,12 +127,11 @@ def migrate():
     except Exception as e:
         if tmp.exists():
             tmp.unlink()
-        raise e
+        raise
 
-    print(f"\n✅ Done: {WEIGHT_PARQUET}")
-    print(f"   Rows  : {len(df):,}")
-    print(f"   Size  : {WEIGHT_PARQUET.stat().st_size / 1024:.1f} KB")
-    print(f"\nParquet sẵn sàng — pipeline mới cứ append vào bình thường.")
+    print(f"\nDone: {WEIGHT_PARQUET}")
+    print(f"   Rows : {len(df):,}")
+    print(f"   Size : {WEIGHT_PARQUET.stat().st_size / 1024:.1f} KB")
 
 
 if __name__ == "__main__":

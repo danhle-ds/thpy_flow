@@ -1,14 +1,17 @@
 """
 core/ingest/gallagher_collector.py
 PKCE OAuth + incremental fetch Gallagher AMC sessions.
-Thêm retry cho tất cả API calls.
+
+Trách nhiệm: fetch only — không ghi file, không update state.
+State/file → raw_gallagher_writer.py
+Delete API  → expose fetch_all_sessions_stats() + delete_session() cho cleanup job.
 """
 from __future__ import annotations
-import base64, hashlib, json, os, re, secrets, time
+
+import base64, hashlib, json, os, re, secrets, time, requests
 from pathlib import Path
 
 import pandas as pd
-import requests
 from dotenv import load_dotenv
 
 from config.paths import GALLAGHER_TOKEN_FILE, GALLAGHER_STATE_FILE
@@ -16,9 +19,9 @@ from config.settings import GALLAGHER_BASE, GALLAGHER_AUTH_URL
 from utils.console import vprint
 
 load_dotenv(Path(r"D:\PYTHON_TOOLS\env\account.env"), override=True)
-_FARM_ID  = os.getenv("GALLAGHER_FARM_ID")
-_USERNAME = os.getenv("GALLAGHER_USERNAME")
-_PASSWORD = os.getenv("GALLAGHER_PASSWORD")
+_FARM_ID     = os.getenv("GALLAGHER_FARM_ID")
+_USERNAME    = os.getenv("GALLAGHER_USERNAME")
+_PASSWORD    = os.getenv("GALLAGHER_PASSWORD")
 _DEVICE_NAME = "GALLAGHER_1"
 
 
@@ -60,8 +63,6 @@ def _login() -> dict:
     if not m:
         raise RuntimeError("Không tìm được action URL trong login page")
     action_url = m.group(1).replace("&amp;", "&")
-
-    #action_url = re.search(r'action="([^"]+)"', r1.text).group(1).replace("&amp;", "&") legacy code
     r2 = sess.post(action_url, data={"username": _USERNAME, "password": _PASSWORD},
                    allow_redirects=False)
     code = re.search(r"code=([^&]+)", r2.headers.get("location", "")).group(1)
@@ -111,49 +112,54 @@ def _headers() -> dict:
     return {"Authorization": f"Bearer {get_token()}", "Content-Type": "application/json"}
 
 
-# ── State ─────────────────────────────────────────────────────────────────────
-def _load_state() -> dict:
-    if GALLAGHER_STATE_FILE.exists():
-        return json.loads(GALLAGHER_STATE_FILE.read_text())
-    sessions: dict[str, str] = {}
-    for f in GALLAGHER_STATE_FILE.parent.glob("[0-9]*.csv"):
-        parts = f.stem.split("_", 1)
-        if len(parts) == 2 and parts[0].isdigit():
-            sessions[parts[0]] = parts[1]
-    state = {"sessions": sessions}
-    _save_state(state)
-    return state
+# ── State (read-only ở đây — write thuộc về raw_gallagher_writer) ─────────────
+def get_saved_ids() -> set[str]:
+    """Trả về set session_id (str) đã được ghi vào state file."""
+    if not GALLAGHER_STATE_FILE.exists():
+        # Bootstrap từ file CSV cũ nếu state chưa có
+        sessions: dict[str, str] = {}
+        for f in GALLAGHER_STATE_FILE.parent.glob("[0-9]*.csv"):
+            parts = f.stem.split("_", 1)
+            if len(parts) == 2 and parts[0].isdigit():
+                sessions[parts[0]] = parts[1]
+        if sessions:
+            GALLAGHER_STATE_FILE.parent.mkdir(parents=True, exist_ok=True)
+            GALLAGHER_STATE_FILE.write_text(
+                json.dumps({"sessions": sessions}, ensure_ascii=False, indent=2)
+            )
+            return set(sessions.keys())
+        return set()
+    state = json.loads(GALLAGHER_STATE_FILE.read_text())
+    return set(state.get("sessions", {}).keys())
 
 
-def _save_state(state: dict) -> None:
-    GALLAGHER_STATE_FILE.parent.mkdir(parents=True, exist_ok=True)
-    GALLAGHER_STATE_FILE.write_text(json.dumps(state, ensure_ascii=False, indent=2))
+# ── API fetch ─────────────────────────────────────────────────────────────────
+def _parse_sid(s: dict) -> int | None:
+    try:
+        return int(s["href"].split("/")[-1])
+    except (KeyError, ValueError, IndexError):
+        return None
 
 
-def _register(state: dict, session_id: int, session_name: str) -> None:
-    state["sessions"][str(session_id)] = session_name
-    _save_state(state)
-
-
-# ── API calls (với retry) ─────────────────────────────────────────────────────
-def _fetch_session_list() -> list[dict]:
-    result, skip, take = [], 0, 100
+def fetch_all_sessions_stats(page_size: int = 100) -> list[dict]:
+    """Lấy toàn bộ sessions từ /stats endpoint (có paginate)."""
+    result, skip = [], 0
     while True:
-        def _call():
+        def _call(skip=skip):
             r = requests.get(
                 f"{GALLAGHER_BASE}/v1.1/farms/{_FARM_ID}/sessions/stats",
                 headers=_headers(),
-                params={"sortBy": "id", "sortOrder": "Descending",
-                        "skip": skip, "take": take, "include": "count"},
+                params={"sortBy": "id", "sortOrder": "Ascending",
+                        "skip": skip, "take": page_size, "include": "count"},
                 timeout=30,
             )
             r.raise_for_status()
             return r.json().get("values", [])
-        batch = _retry(_call, label=f"fetch_session_list skip={skip}")
+        batch = _retry(_call, label=f"fetch_sessions_stats skip={skip}")
         result.extend(batch)
-        if len(batch) < take:
+        if len(batch) < page_size:
             break
-        skip += take
+        skip += page_size
     return result
 
 
@@ -166,6 +172,24 @@ def _fetch_session_detail(session_id: int) -> dict:
         r.raise_for_status()
         return r.json()
     return _retry(_call, label=f"fetch_session_detail {session_id}")
+
+
+def _fetch_session_object(uuid: str) -> dict | None:
+    """Lấy full object của 1 session theo UUID — cần cho PUT delete."""
+    def _call():
+        r = requests.get(
+            f"{GALLAGHER_BASE}/v1.1/farms/{_FARM_ID}/sessions",
+            headers=_headers(),
+            params={
+                "filter":  f"id eq '{uuid}'",
+                "exclude": "sessionInfo,defaultTraits,customViews,sessionDraft,sessionOptions,animals",
+            },
+            timeout=30,
+        )
+        r.raise_for_status()
+        values = r.json().get("values", [])
+        return values[0] if values else None
+    return _retry(_call, label=f"fetch_session_object {uuid}")
 
 
 # ── Transform ─────────────────────────────────────────────────────────────────
@@ -184,47 +208,79 @@ def _safe_name(name: str) -> str:
     return re.sub(r'[\\/:*?"<>|]', "_", name).strip()
 
 
-# ── Public ────────────────────────────────────────────────────────────────────
-#Helped fuction
-def _parse_sid(s: dict) -> int | None:
-    try:
-        return int(s["href"].split("/")[-1])
-    except (KeyError, ValueError, IndexError):
-        return None
-
-
-def collect_new_sessions(raw_dir) -> tuple[pd.DataFrame | None, int]:
-    from pathlib import Path
-    raw_dir = Path(raw_dir)
-    raw_dir.mkdir(parents=True, exist_ok=True)
-
-    state        = _load_state()
-    saved_ids    = set(state["sessions"].keys())
-    all_sessions = _fetch_session_list()
-    new_sessions = [s for s in all_sessions
-                if (sid := _parse_sid(s)) is not None
-                and str(sid) not in saved_ids]
-
-    #new_sessions = [s for s in all_sessions
-    #                if str(int(s["href"].split("/")[-1])) not in saved_ids] legacy code
+# ── Public: fetch new sessions (no file writes) ───────────────────────────────
+def collect_new_sessions(
+    saved_ids: set[str],
+) -> list[tuple[int, str, pd.DataFrame]]:
+    """
+    Fetch các session chưa có trong saved_ids.
+    Trả về list[(session_id, session_name, df)] — không ghi file, không update state.
+    """
+    all_sessions  = fetch_all_sessions_stats()
+    new_sessions  = [
+        s for s in all_sessions
+        if (sid := _parse_sid(s)) is not None
+        and str(sid) not in saved_ids
+    ]
 
     vprint(f"Gallagher: {len(all_sessions)} sessions | "
            f"Đã có: {len(saved_ids)} | Mới: {len(new_sessions)}")
 
-    frames: list[pd.DataFrame] = []
+    results: list[tuple[int, str, pd.DataFrame]] = []
     for s in new_sessions:
         sid  = int(s["href"].split("/")[-1])
         data = _fetch_session_detail(sid)
         df   = _session_to_df(sid, data)
-        fname = raw_dir / f"{sid}_{_safe_name(data.get('name', 'unknown'))}.csv"
-        df.to_csv(fname, index=False, encoding="utf-8-sig")
-        _register(state, sid, data.get("name", "unknown"))
-        vprint(f"  ✅ {fname.name} | {len(df)} animals")
-        if not df.empty:
-            df["source"] = "GALLAGHER"
-            df["device"] = _DEVICE_NAME
-            frames.append(df)
+        name = data.get("name", "unknown")
+        vprint(f"  📥 session {sid} | {name} | {len(df)} animals")
+        results.append((sid, name, df))
 
-    if not frames:
-        return None, len(new_sessions)
-    return pd.concat(frames, ignore_index=True), len(new_sessions)
+    return results
+
+
+# ── Public: delete session (dùng bởi cleanup job) ────────────────────────────
+def delete_session(session_stats: dict, dry_run: bool) -> bool:
+    """
+    Soft delete 1 session bằng PUT isDeleted=true.
+    session_stats: 1 phần tử từ fetch_all_sessions_stats().
+    Trả về True nếu thành công (hoặc dry_run).
+    """
+    uuid = session_stats.get("id", "")
+    if not uuid:
+        vprint(f"   ⚠️  Session không có 'id' field: {session_stats}")
+        return False
+
+    obj = _fetch_session_object(uuid)
+    if not obj:
+        vprint(f"   ⚠️  Không tìm được object: {uuid}")
+        return False
+
+    obj["isDeleted"] = True
+
+    name        = session_stats.get("name", "")
+    created_at  = session_stats.get("createdAt", "")[:10]
+    n_animals   = session_stats.get("animalCount", 0)
+
+    if dry_run:
+        vprint(f"   🔍 [DRY] {uuid} | {name:<25} | {created_at} | animals: {n_animals}")
+        return True
+
+    def _put():
+        r = requests.put(
+            f"{GALLAGHER_BASE}/v1.1/farms/{_FARM_ID}/sessions",
+            headers=_headers(),
+            json=[obj],
+            timeout=30,
+        )
+        r.raise_for_status()
+        return r
+
+    try:
+        r  = _retry(_put, label=f"delete_session {uuid}")
+        ok = r.status_code == 200
+    except Exception as e:
+        vprint(f"   ❌ delete_session lỗi: {e}")
+        return False
+
+    vprint(f"   {'✅' if ok else '❌'} [{r.status_code}] {uuid} | {name:<25} | {created_at} | animals: {n_animals}")
+    return ok

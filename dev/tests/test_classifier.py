@@ -1,95 +1,84 @@
 """
 dev/tests/test_classifier.py
-Unit test: classify_one, add_animal_type
-Dùng tên group thực tế của farm.
+Unit test: classify_by_lac_no, add_animal_type.
+
+Classifier hien tai chi dung lac_no (so lua de) de phan loai:
+  - lac_no >= 1  -> "cow"
+  - lac_no == 0  -> "heifer"
+  - NaN / loi    -> "unknown"
 """
 import pandas as pd
 import pytest
 
-from core.transform.business.classifier import classify_one, add_animal_type
+from core.transform.business.classifier import classify_by_lac_no, add_animal_type
 
 
-class TestDry:
-    def test_dry_DR(self):      assert classify_one("DR1")       == "dry"
-    def test_dry_DRA(self):     assert classify_one("DRA GROUP") == "dry"
-    def test_dry_DRYA(self):    assert classify_one("DRYA")      == "dry"
-    def test_dry_DR_compound(self): assert classify_one("DR C8B")== "dry"
-    def test_dry_TM(self):      assert classify_one("TM1")       == "dry"
-    def test_dry_TD(self):      assert classify_one("TD GROUP")  == "dry"
-    def test_dry_T2(self):      assert classify_one("T2A")       == "dry"
-    def test_dry_lowercase(self): assert classify_one("tm1")     == "dry"
-    def test_dry_lowercase_dr(self): assert classify_one("dr1")  == "dry"
+class TestClassifyByLacNo:
+    # ── cow: da de it nhat 1 lua ──────────────────────────────────────────────
+    def test_cow_lac1(self):         assert classify_by_lac_no(1)    == "cow"
+    def test_cow_lac2(self):         assert classify_by_lac_no(2)    == "cow"
+    def test_cow_lac5(self):         assert classify_by_lac_no(5)    == "cow"
+    def test_cow_lac_float(self):    assert classify_by_lac_no(1.0)  == "cow"
+    def test_cow_lac_string(self):   assert classify_by_lac_no("2")  == "cow"
+    def test_cow_lac_float_str(self):assert classify_by_lac_no("1.0") == "cow"
+
+    # ── heifer: chua de lua nao ───────────────────────────────────────────────
+    def test_heifer_zero(self):      assert classify_by_lac_no(0)    == "heifer"
+    def test_heifer_zero_float(self):assert classify_by_lac_no(0.0)  == "heifer"
+    def test_heifer_zero_str(self):  assert classify_by_lac_no("0")  == "heifer"
+    def test_heifer_negative(self):  assert classify_by_lac_no(-1)   == "heifer"
+
+    # ── unknown: khong co thong tin ───────────────────────────────────────────
+    def test_unknown_nan(self):      assert classify_by_lac_no(float("nan")) == "unknown"
+    def test_unknown_none(self):     assert classify_by_lac_no(None)         == "unknown"
+    def test_unknown_empty_str(self):assert classify_by_lac_no("")           == "unknown"
+    def test_unknown_text(self):     assert classify_by_lac_no("abc")        == "unknown"
+
+    # ── boundary: lac_no = 1 la nguong phan biet cow vs heifer ───────────────
+    def test_boundary_exactly_1(self):
+        assert classify_by_lac_no(1) == "cow"
+
+    def test_boundary_below_1(self):
+        assert classify_by_lac_no(0.9) == "heifer"
 
 
-class TestHeifer:
-    def test_heifer_H1(self):        assert classify_one("H1")      == "heifer"
-    def test_heifer_H3A(self):       assert classify_one("H3A")     == "heifer"
-    def test_heifer_H8B(self):       assert classify_one("H8B")     == "heifer"
-    def test_heifer_H_standalone(self): assert classify_one("H H8A")== "heifer"
-    def test_heifer_CV(self):        assert classify_one("CV H6A")  == "heifer"
-    def test_heifer_CV_short(self):  assert classify_one("CV1")     == "heifer"
-    def test_heifer_R(self):         assert classify_one("R H8B")   == "heifer"
-    def test_heifer_N(self):         assert classify_one("N1")      == "heifer"
-    def test_heifer_lowercase(self): assert classify_one("h3a")     == "heifer"
-    def test_heifer_cv_not_milking(self): assert classify_one("CV1") != "milking_cow"
-
-    # H9 / H0 không hợp lệ
-    def test_not_heifer_H9(self):    assert classify_one("H9")      == "other"
-    def test_not_heifer_H0(self):    assert classify_one("H0")      == "other"
-
-
-class TestMilking:
-    def test_milking_M(self):         assert classify_one("M1")          == "milking_cow"
-    def test_milking_M2(self):        assert classify_one("M2 C7A")      == "milking_cow"
-    def test_milking_MC(self):        assert classify_one("MC C6A")      == "milking_cow"
-    def test_milking_MH(self):        assert classify_one("MH C8A")      == "milking_cow"
-    def test_milking_HOS(self):       assert classify_one("HOS1")        == "milking_cow"
-    def test_milking_HOS_compound(self): assert classify_one("MC HOS A12") == "milking_cow"
-    def test_milking_C_digit(self):   assert classify_one("C6A")         == "milking_cow"
-    def test_milking_C_reversed(self): assert classify_one("C6A MC")     == "milking_cow"
-    def test_milking_C8(self):        assert classify_one("C8A")         == "milking_cow"
-    def test_milking_lowercase(self): assert classify_one("m1")          == "milking_cow"
-    def test_milking_c_digit_lower(self): assert classify_one("c6a")     == "milking_cow"
-
-
-class TestOther:
-    def test_other_unknown(self):   assert classify_one("XYZ1")          == "other"
-    def test_other_none(self):      assert classify_one(None)             == "other"
-    def test_other_empty(self):     assert classify_one("")               == "other"
-    def test_other_nan(self):       assert classify_one(float("nan"))     == "other"
-    def test_other_whitespace(self): assert classify_one("   ")           == "other"
-
-
-class TestAddCattleType:
-
-    def test_adds_column(self):
-        df = pd.DataFrame({"group_name": ["M1", "H3A", "DR1"]})
+class TestAddAnimalType:
+    def test_adds_animal_type_column(self):
+        df = pd.DataFrame({"lac_no": [1, 0, None]})
         result = add_animal_type(df)
         assert "animal_type" in result.columns
 
-    def test_correct_classification(self):
-        df = pd.DataFrame({"group_name": [
-            "MC C6A", "H3A", "DR1", "HOS1", "C6A", "CV H6A", "TM1"
-        ]})
+    def test_correct_values(self):
+        df = pd.DataFrame({"lac_no": [2, 1, 0, None]})
         result = add_animal_type(df)
-        assert result["animal_type"].tolist() == [
-            "milking_cow", "heifer", "dry", "milking_cow",
-            "milking_cow", "heifer", "dry",
-        ]
+        assert result["animal_type"].tolist() == ["cow", "cow", "heifer", "unknown"]
 
-    def test_cv_is_heifer_not_milking(self):
-        df = pd.DataFrame({"group_name": ["CV1", "CV H6A", "C6A", "C1"]})
+    def test_missing_lac_no_col(self):
+        df = pd.DataFrame({"other_col": [1, 2, 3]})
         result = add_animal_type(df)
-        assert result["animal_type"].tolist() == [
-            "heifer", "heifer", "milking_cow", "milking_cow"
-        ]
-
-    def test_missing_group_col(self):
-        df = pd.DataFrame({"other_col": ["x", "y"]})
-        result = add_animal_type(df)
-        assert (result["animal_type"] == "other").all()
+        assert (result["animal_type"] == "unknown").all()
 
     def test_does_not_modify_original(self):
-        df = pd.DataFrame({"group_name": ["M1"]})
+        df = pd.DataFrame({"lac_no": [1, 0]})
         add_animal_type(df)
         assert "animal_type" not in df.columns
+
+    def test_all_cow(self):
+        df = pd.DataFrame({"lac_no": [1, 2, 3, 5]})
+        result = add_animal_type(df)
+        assert (result["animal_type"] == "cow").all()
+
+    def test_all_heifer(self):
+        df = pd.DataFrame({"lac_no": [0, 0, 0]})
+        result = add_animal_type(df)
+        assert (result["animal_type"] == "heifer").all()
+
+    def test_custom_lac_col(self):
+        df = pd.DataFrame({"custom_lac": [1, 0]})
+        result = add_animal_type(df, lac_col="custom_lac")
+        assert result["animal_type"].tolist() == ["cow", "heifer"]
+
+    def test_string_lac_values(self):
+        df = pd.DataFrame({"lac_no": ["3", "0", "nan"]})
+        result = add_animal_type(df)
+        assert result["animal_type"].tolist() == ["cow", "heifer", "unknown"]

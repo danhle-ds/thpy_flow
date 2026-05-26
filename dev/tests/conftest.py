@@ -1,6 +1,6 @@
 """
 dev/tests/conftest.py
-pytest fixtures — inline DataFrames, không cần file thật hay env thật.
+pytest fixtures — inline DataFrames, khong can file that hay env that.
 """
 import os
 import sys
@@ -9,7 +9,8 @@ from pathlib import Path
 import pandas as pd
 import pytest
 
-# ── Patch env trước khi import project modules ────────────────────────────────
+# ── Patch env truoc khi import project modules ────────────────────────────────
+# Tat ca key nay phai match voi nhung gi config/paths.py goi _e() hoac os.getenv()
 os.environ.update({
     "RUN_MODE":                    "dry_run",
     "LOCAL_OUT_DIR":               r"D:\TEST_ENV",
@@ -20,33 +21,32 @@ os.environ.update({
     "ONEDRIVE_THG":                "OneDrive - CompanyName",
     "ONEDRIVE_FARM_REPORT_OWNER":  "Farm Report",
     "TOTAL_HERD_SUB":              "RAW DATA/HERD INFO/TOTAL HERD",
+    "SHARE_FILE_EXCEL":            "SHARE/EXCEL",   # dung cho MONTHLY_UA_DIR
     "PTM_USERNAME":                "test_user",
     "PTM_PASSWORD":                "test_pass",
     "TELEGRAM_BOT_TOKEN_INFOR":    "test_token",
+    "ALERT_MAIL":                  "test@example.com",
 })
 
-# Add project root vào sys.path
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
 
 # ── Fixtures ──────────────────────────────────────────────────────────────────
 @pytest.fixture
 def sample_raw_lines() -> list[str]:
-    """Các dòng PTM blob hợp lệ và không hợp lệ."""
     return [
-        "13; 638,0;TR:0964001034804128;12/03/2024;07:01;S",   # valid
-        "1; 425,5;TR:0964001099999999;05/05/2024;08:30;S",    # valid
-        "DATE",                                                  # invalid — header
-        "TOTAL SUM; 1063,5",                                    # invalid
-        "",                                                      # invalid — empty
-        "AVERAGE WEIGHT; 531",                                  # invalid
-        "2; 350,0;TR:;01/01/2024;09:00;S",                    # valid, ear_tag rỗng
+        "13; 638,0;TR:0964001034804128;12/03/2024;07:01;S",
+        "1; 425,5;TR:0964001099999999;05/05/2024;08:30;S",
+        "DATE",
+        "TOTAL SUM; 1063,5",
+        "",
+        "AVERAGE WEIGHT; 531",
+        "2; 350,0;TR:;01/01/2024;09:00;S",
     ]
 
 
 @pytest.fixture
 def sample_weight_df() -> pd.DataFrame:
-    """DataFrame sau bước parse — sẵn sàng cho clean + merge."""
     return pd.DataFrame({
         "source":        ["PTM", "PTM", "PTM", "PTM"],
         "device":        ["CIMA1", "CIMA1", "CIMA2", "CIMA2"],
@@ -60,13 +60,12 @@ def sample_weight_df() -> pd.DataFrame:
 
 @pytest.fixture
 def sample_herd_df() -> pd.DataFrame:
-    """Snapshot Total Herd tối giản để test merge."""
     return pd.DataFrame({
         "date":          ["2024-05-01", "2024-05-01", "2024-05-01"],
         "no":            ["1001", "1002", "1003"],
         "transp_2":      ["64001034804128", "64001099999999", "64001055555555"],
         "group_name":    ["M1", "H2", "C3"],
-            "age_days":      [730, 270, 1460],
+        "age_days":      [730, 270, 1460],
         "age_month_fix": [24.0, 9.0, 48.0],
         "dim":           [45, None, 120],
         "lac_no":        [2, None, 4],
@@ -75,7 +74,6 @@ def sample_herd_df() -> pd.DataFrame:
 
 @pytest.fixture
 def sample_merged_df(sample_weight_df, sample_herd_df) -> pd.DataFrame:
-    """DataFrame sau merge — dùng cho test classify + dtype."""
     from core.transform.business.cleaner import clean_ear_tag
     from core.transform.business.herd_merger import merge_with_herd
     df = clean_ear_tag(sample_weight_df)

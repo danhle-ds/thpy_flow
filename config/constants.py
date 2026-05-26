@@ -19,20 +19,6 @@ PTM_DEVICES: dict[str, str] = {
 # ── Gallagher API ─────────────────────────────────────────────────────────────
 GALLAGHER_BASE     = "https://am.app.gallagher.com/amc/api"
 GALLAGHER_AUTH_URL = "https://auth.gallagher.com/auth/realms/gallagher/protocol/openid-connect"
-
-# ── Cattle classifier — priority: DRY → HEIFER → MILKING ─────────────────────
-# DRY   : TM*, TD*, T2*, DR*, DRA*, DRYA*, "DR C8B", ...
-DRY_PREFIXES = ("DR", "T")
-
-# HEIFER: H[1-8]* hoặc H đứng một mình, CV*, R*, N*
-#         H9 / H0 không hợp lệ → "other"
-HEIFER_PATTERN = re.compile(r"^(H([1-8]|$)|CV|N|R)")
-
-# MILKING: M*, HOS*, C[1-8]*
-#          C[1-8] dùng regex riêng để tránh collision với CV* (heifer)
-MILKING_PREFIXES  = ("M", "HOS")
-MILKING_C_PATTERN = re.compile(r"^C[1-8]")
-
 # ── Parquet schema — thứ tự cột chuẩn ────────────────────────────────────────
 PARQUET_COL_ORDER = [
     "source", "device",
@@ -79,3 +65,7 @@ def coverage_threshold(week_of_month: int) -> float:
 def week_of_month(d) -> int:
     """Tuần thứ mấy trong tháng (1-indexed)."""
     return (d.day - 1) // 7 + 1
+
+#CLEAN GALLAGHER_LIMIT
+GALLAGHER_ANIMAL_THRESHOLD = 9000
+GALLAGHER_CLEANUP_BUFFER = 2000

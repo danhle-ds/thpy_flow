@@ -182,9 +182,9 @@ def _render_html(context: dict) -> str:
 
 
 # ── Public ────────────────────────────────────────────────────────────────────
-def run() -> dict:
+def run(today: date | None = None) -> dict:
     t0    = time.time()
-    today = date.today()
+    today = today or date.today()
     print(f"\n{'─'*60}\n📧 Weekly Report | {today.strftime('%d/%m/%Y')}\n{'─'*60}")
 
     mail_send = os.getenv("MAIL_SEND")
