@@ -1,6 +1,5 @@
 """
 
-__BACKUP_RETENTION_DAYS = 7
 core/load/atomic.py
 Atomic write (tmp → rename), backup, purge backup cũ.
 Dùng chung cho parquet và CSV.
@@ -64,7 +63,7 @@ def make_backup(target: Path) -> Path | None:
 def purge_old_backups(
     folder: Path,
     stem: str,
-    max_days: int = _BACKUP_RETENTION_DAYS,
+    max_days: int = 7,
 ) -> None:
     """Xóa backup cũ hơn max_days ngày trong PARQUET_BACKUP_DIR."""
     if not PARQUET_BACKUP_DIR.exists():

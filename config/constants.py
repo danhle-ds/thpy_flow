@@ -27,7 +27,7 @@ PARQUET_COL_ORDER = [
     "no", "ear_tag",
     "group_name", "animal_type",
     "weight_kg",
-    "age_month", "age_day",
+    "age_month", "age_days",
     "dim", "lac_no",
     "loaded_at",
 ]
@@ -68,7 +68,7 @@ def week_of_month(d) -> int:
     return (d.day - 1) // 7 + 1
 
 #CLEAN GALLAGHER_LIMIT
-GALLAGHER_ANIMAL_THRESHOLD = 9000
+GALLAGHER_ANIMAL_THRESHOLD = 8000
 GALLAGHER_CLEANUP_BUFFER = 2000
 
 # ── Weight range dùng cho filter outlier và aggregate CSV ─────────────────────
@@ -76,3 +76,17 @@ WEIGHT_OUTLIER_LOW  = 60.0
 WEIGHT_OUTLIER_HIGH = 900.0
 
 NO_DATA_ALERT_DAYS = 7
+
+# ── Monthly report: nhóm bò sữa theo lac_no + DIM ────────────────────────────
+# Dùng để đánh giá coverage % theo từng giai đoạn sản xuất, target >= 30%
+MONTHLY_COW_GROUPS = [
+    # Heifer age groups (giống weekly)
+    {"label": "Heifer 6mo (5.5-6.9)",       "type": "heifer", "age_min": 5.5,   "age_max": 6.9,   "w_low": 100, "w_high": 350},
+    {"label": "Heifer 9mo (8.5-9.9)",       "type": "heifer", "age_min": 8.5,   "age_max": 9.9,   "w_low": 250, "w_high": 500},
+    {"label": "Heifer 12mo (11.5-12.9)",    "type": "heifer", "age_min": 11.5,   "age_max": 12.9,  "w_low": 300, "w_high": 600},
+    # Milking cow groups (lac_no + dim)
+    {"label": "1st Calving", "type": "cow",    "lac_min": 1,   "lac_max": 1,   "dim_min": 0,   "dim_max": 30,  "w_low": 300, "w_high": 700},
+    {"label": "1st Peak",    "type": "cow",    "lac_min": 1,   "lac_max": 1,   "dim_min": 30,  "dim_max": 120, "w_low": 300, "w_high": 700},
+    {"label": "All Lact Peak","type": "cow",   "lac_min": 1,   "lac_max": 20,  "dim_min": 30,  "dim_max": 120, "w_low": 300, "w_high": 700},
+    {"label": "MBW",         "type": "cow",    "lac_min": 3,   "lac_max": 4,   "dim_min": 120, "dim_max": 180, "w_low": 400, "w_high": 900},
+]

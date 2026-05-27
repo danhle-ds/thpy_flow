@@ -165,7 +165,6 @@ def _build_context(today: date) -> dict:
         "month_label":    today.strftime("%m/%Y"),
         "period_str":     f"{today.replace(day=1).strftime('%d/%m/%Y')} → {today.strftime('%d/%m/%Y')}",
         "total_weighed":  total_weighed,
-        "n_age_groups":   len(AGE_GROUPS),
         "threshold_pct":  threshold,
         "age_groups":     age_groups_ctx,
         "has_warning":    has_warning,

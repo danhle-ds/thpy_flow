@@ -66,6 +66,7 @@ def migrate():
 
     rename_map = {
         "cow_id":       "no",
+        "age_days":     "age_days",
         "age_months":   "age_month",
         "lactation_no": "lac_no",
     }
@@ -93,11 +94,11 @@ def migrate():
             df[col] = _strip_dot_zero(df[col])
 
     df["weight_kg"] = pd.to_numeric(df.get("weight_kg"), errors="coerce").astype("float32")
-    # round(1) để nhất quán với herd_merger: age_month = round(age_day/30.44, 1)
+    # round(1) để nhất quán với herd_merger: age_month = round(age_days/30.44, 1)
     df["age_month"] = pd.to_numeric(df.get("age_month"), errors="coerce").round(1).astype("float32")
-    df["age_day"]  = pd.to_numeric(df.get("age_day"),  errors="coerce").astype("Int16")
-    df["dim"]       = pd.to_numeric(df.get("dim"),       errors="coerce").astype("Int16")
-    df["lac_no"]    = pd.to_numeric(df.get("lac_no"),    errors="coerce").astype("Int8")
+    df["age_days"]  = pd.to_numeric(df["age_days"]  if "age_days"  in df.columns else None, errors="coerce").astype("Int16")
+    df["dim"]       = pd.to_numeric(df["dim"]       if "dim"       in df.columns else None, errors="coerce").astype("Int16")
+    df["lac_no"]    = pd.to_numeric(df["lac_no"]    if "lac_no"    in df.columns else None, errors="coerce").astype("Int8")
 
     ordered = [c for c in PARQUET_COL_ORDER if c in df.columns]
     extra   = [c for c in df.columns if c not in ordered]

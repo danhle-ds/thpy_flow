@@ -25,7 +25,7 @@ from utils.schema_loader import get_col_mapping, get_strip_dot_zero_cols, get_xl
 
 # ── Cột cần trả về ────────────────────────────────────────────────────────────
 _MERGE_COLS = ["no", "transp_2", "group_name",
-               "age_day",  "dim", "lac_no"]
+               "age_days", "dim", "lac_no"]
 
 
 

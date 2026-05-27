@@ -27,7 +27,7 @@ def _herd_df(snapshot_date: str = "2024-05-03") -> pd.DataFrame:
         "transp_2":      ["AAA111", "BBB222"],
         "group_name":    ["M1", "H3"],
         
-        "age_day":      [732, 272],     # tính tại ngày snapshot
+        "age_days":      [732, 272],     # tính tại ngày snapshot
                 "dim":           [47, None],
         "lac_no":        [2, None],
     })
@@ -43,10 +43,10 @@ class TestMergeWithHerd:
         assert merged["no"].isna().sum() == 1   # UNKNOWN999
 
     def test_age_adjusted(self):
-        # Snapshot 2 ngày sau ngày cân → age_day phải giảm 2
+        # Snapshot 2 ngày sau ngày cân → age_days phải giảm 2
         merged = merge_with_herd(_weight_df(), _herd_df("2024-05-03"))
         row = merged[merged["ear_tag"] == "AAA111"].iloc[0]
-        assert row["age_day"] == 730   # 732 - 2
+        assert row["age_days"] == 730   # 732 - 2
 
     def test_dim_adjusted(self):
         merged = merge_with_herd(_weight_df(), _herd_df("2024-05-03"))
@@ -59,10 +59,10 @@ class TestMergeWithHerd:
         assert row["age_month"] == pytest.approx(24.0, abs=0.5)
 
     def test_age_month_computed_fallback(self):
-        """Khi age_day co, age_month = round(age_day/30.44, 1)."""
+        """Khi age_days co, age_month = round(age_days/30.44, 1)."""
         merged = merge_with_herd(_weight_df(), _herd_df())
         row = merged[merged["ear_tag"] == "UNKNOWN999"].iloc[0]
-        # No herd match → age_month None hoặc computed (age_day None)
+        # No herd match → age_month None hoặc computed (age_days None)
         assert pd.isna(row["age_month"]) or row["age_month"] is None
 
     def test_no_herd_returns_null_cols(self):

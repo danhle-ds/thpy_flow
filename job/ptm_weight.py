@@ -16,7 +16,7 @@ import pandas as pd
 
 from config.constants import PTM_DEVICES
 from config.settings import (
-    N_DAY_RUNNING, IS_DRY_RUN,
+    N_DAY_RUNNING, IS_DRY_RUN, TELEGRAM_ENABLED,
     DATE_FROM_OVERRIDE, DATE_TO_OVERRIDE,
     DEVICE_ENABLED, RAW_PARSE_ONLY,
     DOWNLOAD_ONLY
@@ -220,7 +220,7 @@ def run() -> dict:
         log(JOB_NAME, dev, "completed", dur,
             f"herd={herd_source} | new={len(df_final)} | master={len(df_master)}")
 
-    if not IS_DRY_RUN and tg.BOT_TOKEN and tg.CHAT_INFO:
+    if not IS_DRY_RUN and TELEGRAM_ENABLED and tg.BOT_TOKEN and tg.CHAT_INFO:
         tg.send_telegram_message(
             tg.CHAT_INFO,
             f"✅ <b>ptm_weight</b> hoàn tất\n"

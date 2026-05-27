@@ -104,21 +104,12 @@
     <div class="sub">Trang trại PYHTF &nbsp;·&nbsp; Kỳ giám sát: {{ period_str }}</div>
   </div>
 
-  <div class="section">
-    <div class="summary-row">
-      <div class="stat-card">
-        <div class="val">{{ total_weighed }}</div>
-        <div class="lbl">Đã cân<br>(Distinct)</div>
-      </div>
-      <div class="stat-card">
-        <div class="val">{{ n_age_groups }}</div>
-        <div class="lbl">Lứa tuổi<br>Theo dõi</div>
-      </div>
-      <div class="stat-card">
-        <div class="val">{{ threshold_pct }}%</div>
-        <div class="lbl">Ngưỡng tối thiểu<br>(Tuần {{ week_of_month }})</div>
-      </div>
-    </div>
+  <div class="section" style="padding: 16px 32px;">
+    <span style="font-size:18px; font-weight:700; color:#0f4c81;">{{ total_weighed }}</span>
+    <span style="font-size:13px; color:#4a5568;"> bò đã cân (distinct)</span>
+    <span style="margin: 0 12px; color:#e2e8f0;">|</span>
+    <span style="font-size:18px; font-weight:700; color:#0f4c81;">{{ threshold_pct }}%</span>
+    <span style="font-size:13px; color:#4a5568;"> ngưỡng tối thiểu (Tuần {{ week_of_month }})</span>
   </div>
 
   <div class="section">

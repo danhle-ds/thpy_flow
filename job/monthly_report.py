@@ -28,7 +28,7 @@ from pathlib import Path
 import duckdb
 import pandas as pd
 
-from config.constants import AGE_GROUPS, PARQUET_COL_ORDER, PTM_DEVICES
+from config.constants import AGE_GROUPS, MONTHLY_COW_GROUPS, PARQUET_COL_ORDER, PTM_DEVICES
 from config.settings import IS_DRY_RUN, DEVICE_ENABLED
 from config.paths import (
     TOTAL_HERD_PARQUET,
@@ -46,7 +46,6 @@ _MONTHLY_THRESHOLD = 30.0           # ngưỡng coverage cuối tháng cố đ�
 _WEIGHT_LOW        = 100            # outlier filter cho clean_re_outlier
 _WEIGHT_HIGH       = 800
 _GALLAGHER_DEVICE  = "GALLAGHER_1"
-_DEFAULT_MAIL_TO   = ["danh.ln@thmilk.vn"]
 
 
 # ── Date helpers ──────────────────────────────────────────────────────────────
@@ -278,6 +277,90 @@ def _build_summary_df(month_start: date, month_end: date) -> pd.DataFrame:
     return {"summary_data": df, "meta": meta}
 
 
+
+def _query_monthly_groups(
+    month_start: date, month_end: date
+) -> list[dict]:
+    """
+    Tính weighed distinct + avg weight + coverage cho MONTHLY_COW_GROUPS.
+    Baseline: total_herd snapshot đầu tháng.
+    """
+    if not WEIGHT_PARQUET.exists() or not TOTAL_HERD_PARQUET.exists():
+        return []
+
+    start_str = month_start.strftime("%Y-%m-%d")
+    end_str   = month_end.strftime("%Y-%m-%d")
+    con       = duckdb.connect()
+
+    snap_date = con.execute(f"""
+        SELECT MIN(date) FROM read_parquet('{TOTAL_HERD_PARQUET}')
+        WHERE date >= '{start_str}'
+    """).fetchone()[0]
+
+    results = []
+    for g in MONTHLY_COW_GROUPS:
+        # ── Baseline (total_herd) ──────────────────────────────────────────
+        if g["type"] == "heifer":
+            baseline = con.execute(f"""
+                SELECT COUNT(*) FROM read_parquet('{TOTAL_HERD_PARQUET}')
+                WHERE date = '{snap_date}'
+                  AND age_month_fix >= {g['age_min']}
+                  AND age_month_fix <  {g['age_max']}
+            """).fetchone()[0] if snap_date else 0
+        else:
+            baseline = con.execute(f"""
+                SELECT COUNT(*) FROM read_parquet('{TOTAL_HERD_PARQUET}')
+                WHERE date = '{snap_date}'
+                  AND lac_no >= {g['lac_min']}
+                  AND lac_no <= {g['lac_max']}
+                  AND dim    >= {g['dim_min']}
+                  AND dim    <  {g['dim_max']}
+            """).fetchone()[0] if snap_date else 0
+
+        # ── Weighed (weight_db_api) ────────────────────────────────────────
+        if g["type"] == "heifer":
+            where_w = (
+                f"animal_type = 'heifer' "
+                f"AND age_month >= {g['age_min']} AND age_month < {g['age_max']}"
+            )
+        else:
+            lac_cond = (
+                f"(lac_no = {g['lac_min']})"
+                if g['lac_min'] == g['lac_max'] else
+                f"(lac_no >= {g['lac_min']} AND lac_no <= {g['lac_max']})"
+            )
+            where_w = (
+                f"animal_type = 'cow' AND {lac_cond} "
+                f"AND dim >= {g['dim_min']} AND dim < {g['dim_max']}"
+            )
+
+        row = con.execute(f"""
+            SELECT COUNT(DISTINCT no), ROUND(AVG(weight_kg), 1), COUNT(*)
+            FROM read_parquet('{WEIGHT_PARQUET}')
+            WHERE date >= '{start_str}' AND date <= '{end_str}'
+              AND {where_w}
+              AND weight_kg >= {g['w_low']} AND weight_kg <= {g['w_high']}
+              AND no IS NOT NULL
+        """).fetchone()
+
+        weighed  = int(row[0] or 0)
+        avg_w    = float(row[1]) if row[1] else None
+        coverage = round(weighed / baseline * 100, 1) if baseline > 0 else 0.0
+
+        results.append({
+            "label":    g["label"],
+            "baseline": int(baseline),
+            "weighed":  weighed,
+            "coverage": coverage,
+            "ok":       coverage >= 30.0,
+            "avg_w":    avg_w,
+            "w_range":  f"{g['w_low']}–{g['w_high']}kg",
+        })
+
+    con.close()
+    return results
+
+
 # ── Build Excel ───────────────────────────────────────────────────────────────
 def _build_excel(
     output_path: Path,
@@ -352,47 +435,86 @@ def _build_excel(
 # ── Build email HTML ──────────────────────────────────────────────────────────
 from datetime import date
 
-def _build_html(month_start: date, month_end: date, stats: dict) -> str:
-    period = f"{month_start.strftime('%d/%m/%Y')} → {month_end.strftime('%d/%m/%Y')}"
-    
-    # Thay đổi logic tạo rows_html từ thẻ <tr><td> sang các đoạn văn (paragraph) có bullet point
-    rows_html = "".join(
-        f'<p style="margin: 6px 0;">• <b>{k}:</b> {v}</p>'
-        for k, v in stats.items()
-    )
-    
+def _build_html(
+    month_start: date, month_end: date,
+    clean_count: int, outlier_count: int, monthly_groups: list[dict],
+) -> str:
+    """Email thân thiện cho Operation Team."""
+    period   = f"{month_start.strftime('%d/%m/%Y')} → {month_end.strftime('%d/%m/%Y')}"
+    month_lbl = month_start.strftime("%m/%Y")
+
+    # Table rows
+    rows_html = ""
+    for g in monthly_groups:
+        color = "#38a169" if g["ok"] else "#e53e3e"
+        avg   = f"{g['avg_w']:.1f} kg" if g["avg_w"] else "—"
+        rows_html += f"""
+        <tr>
+          <td style="padding:8px 12px; border-bottom:1px solid #edf2f7;">{g['label']}</td>
+          <td style="padding:8px 12px; border-bottom:1px solid #edf2f7; text-align:right; color:#4a5568;">{g['baseline']}</td>
+          <td style="padding:8px 12px; border-bottom:1px solid #edf2f7; text-align:right; font-weight:600;">{g['weighed']}</td>
+          <td style="padding:8px 12px; border-bottom:1px solid #edf2f7; text-align:right; color:{color}; font-weight:700;">{g['coverage']}%</td>
+          <td style="padding:8px 12px; border-bottom:1px solid #edf2f7; text-align:right; color:#0f4c81;">{avg}</td>
+        </tr>"""
+
     return f"""
-    <div style="font-family: Arial, sans-serif; font-size: 14px; color: #333333; line-height: 1.6;">
+    <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Arial, sans-serif;
+                font-size:14px; color:#212529; max-width:680px; margin:0 auto; line-height:1.6;">
+      <div style="background:#0f4c81; padding:24px 32px; border-radius:8px 8px 0 0;">
+        <h2 style="margin:0; color:#fff; font-size:18px;">Dữ liệu cân bò tháng {month_lbl}</h2>
+        <p style="margin:4px 0 0; color:rgba(255,255,255,.7); font-size:13px;">{period}</p>
+      </div>
+
+      <div style="background:#fff; padding:24px 32px; border:1px solid #e2e8f0; border-top:none;">
         <p>Dear all,</p>
-        
-        <p>Đính kèm dữ liệu cân bò tháng <strong>{month_start.strftime('%m/%Y')}</strong> ({period}).</p>
-        
-        <div style="background-color: #f8f9fa; border-left: 4px solid #007bff; padding: 12px 16px; margin: 15px 0;">
-            <p style="margin-top: 0; margin-bottom: 8px; font-weight: bold; color: #007bff;">📊 TÓM TẮT SỐ LIỆU:</p>
-            {rows_html}
+        <p>Đính kèm dữ liệu cân bò tháng <strong>{month_lbl}</strong>.</p>
+
+        <div style="display:flex; gap:16px; margin:20px 0;">
+          <div style="flex:1; background:#f7fafc; border:1px solid #e2e8f0;
+                      border-radius:6px; padding:14px; text-align:center;">
+            <div style="font-size:24px; font-weight:700; color:#0f4c81;">{clean_count:,}</div>
+            <div style="font-size:11px; color:#718096; margin-top:4px;">Bò đã cân (distinct)</div>
+          </div>
+          <div style="flex:1; background:#fff8f0; border:1px solid #fed7aa;
+                      border-radius:6px; padding:14px; text-align:center;">
+            <div style="font-size:24px; font-weight:700; color:#dd6b20;">{outlier_count:,}</div>
+            <div style="font-size:11px; color:#718096; margin-top:4px;">Cân nặng bất thường</div>
+          </div>
         </div>
-        
-        <p style="margin-bottom: 5px;"><strong>File đính kèm:</strong></p>
-        <ul style="margin-top: 0; padding-left: 20px;">
-            <li style="margin-bottom: 6px;">
-                <code style="background-color: #f1f1f1; padding: 2px 4px; border-radius: 3px; font-family: Consolas, monospace;">full_flow.xlsx</code>: 
-                ptm_raw, gallagher_raw, clean_csv, clean_re_outlier (weight {_WEIGHT_LOW}–{_WEIGHT_HIGH}kg), summary (coverage 30%)
-            </li>
-            <li>
-                <code style="background-color: #f1f1f1; padding: 2px 4px; border-radius: 3px; font-family: Consolas, monospace;">for_ua_import.csv</code>: 
-                dữ liệu clean_re_outlier để import UA
-            </li>
-        </ul>
-        
-        <br>
-        <p style="color: #888888; font-style: italic; font-size: 11px; margin-top: 20px;">
-            Automatic report
+
+        <h3 style="font-size:13px; font-weight:700; color:#4a5568;
+                   text-transform:uppercase; letter-spacing:.5px; margin:20px 0 12px;">
+          Coverage theo nhóm (target ≥ 30%)
+        </h3>
+        <table style="width:100%; border-collapse:collapse; font-size:13px;">
+          <thead>
+            <tr style="background:#f7fafc;">
+              <th style="padding:10px 12px; text-align:left; border-bottom:2px solid #e2e8f0; color:#4a5568;">Nhóm</th>
+              <th style="padding:10px 12px; text-align:right; border-bottom:2px solid #e2e8f0; color:#4a5568;">Kế hoạch</th>
+              <th style="padding:10px 12px; text-align:right; border-bottom:2px solid #e2e8f0; color:#4a5568;">Đã cân</th>
+              <th style="padding:10px 12px; text-align:right; border-bottom:2px solid #e2e8f0; color:#4a5568;">Coverage</th>
+              <th style="padding:10px 12px; text-align:right; border-bottom:2px solid #e2e8f0; color:#4a5568;">Cân nặng TB</th>
+            </tr>
+          </thead>
+          <tbody>{rows_html}
+          </tbody>
+        </table>
+
+        <p style="margin-top:20px; font-size:13px; color:#4a5568;">
+          <strong>File đính kèm:</strong><br>
+          &nbsp;• <code style="background:#f1f1f1; padding:2px 4px; border-radius:3px;">for_ua_import.csv</code>
+              — import vào Uniform Agri<br>
+          &nbsp;• <code style="background:#f1f1f1; padding:2px 4px; border-radius:3px;">full_flow.xlsx</code>
+              — ptm_raw, gallagher_raw, clean_csv, clean_re_outlier
         </p>
-    </div>
-    """
+
+        <p style="margin-top:20px; font-size:11px; color:#a0aec0; font-style:italic;">
+          Automatic report — {datetime.now().strftime("%d/%m/%Y %H:%M")}
+        </p>
+      </div>
+    </div>"""
 
 
-# ── Public ────────────────────────────────────────────────────────────────────
 def run(today: date | None = None) -> dict:
     """
     today: truyền vào để test (vd: date(2026, 4, 30)).
@@ -457,14 +579,19 @@ def run(today: date | None = None) -> dict:
         vprint(f"   📄 CSV: {csv_path.name} (fallback clean_csv vì outlier empty)")
 
     # ── Step 4: Gửi email ─────────────────────────────────────────────────────
+    _alert  = os.getenv("ALERT_MAIL", "")
     mail_to = [m.strip() for m in os.getenv("OP_MAIL_TO", "").split(",") if m.strip()] \
-              or _DEFAULT_MAIL_TO
+              or ([_alert] if _alert else [])
     mail_cc = [m.strip() for m in os.getenv("OP_MAIL_CC", "").split(",") if m.strip()]
     mail_send = os.getenv("MAIL_SEND", mail_to[0])
     subject   = f"[PYHTF] Báo cáo cân bò tháng {month_label}"
 
     attachments = [p for p in [excel_path, csv_path] if p.exists()]
-    html_body   = _build_html(month_start, month_end, stats)
+    monthly_groups = _query_monthly_groups(month_start, month_end)
+    clean_count   = clean_df["no"].notna().sum() if not clean_df.empty else 0
+    outlier_count = len(clean_df) - len(outlier_df) if not clean_df.empty else 0
+    html_body     = _build_html(month_start, month_end,
+                                int(clean_count), int(outlier_count), monthly_groups)
 
     ok = False
     if IS_DRY_RUN:

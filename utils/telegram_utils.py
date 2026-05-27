@@ -18,7 +18,7 @@ from pathlib import Path
 import requests
 
 # ── Token & Chat IDs ──────────────────────────────────────────────────────────
-BOT_TOKEN    = os.getenv("TELEGRAM_BOT_TOKEN_INFOR", "")
+BOT_TOKEN    = os.getenv("TELEGRAM_BOT_TOKEN", "")
 
 CHAT_TESTING = os.getenv("TELEGRAM_CHAT_ID", "")
 CHAT_DAILY   = os.getenv("TELEGRAM_CHAT_ID_2", "")

@@ -14,8 +14,12 @@ from config.paths import TOTAL_HERD_PARQUET
 from utils.id_utils import strip_dot_zero
 
 # ── Cột cần trả về ────────────────────────────────────────────────────────────
+# Tên cột thật trong total_herd.parquet (db_saver_total_herd dùng age_days)
 _MERGE_COLS = ["no", "transp_2", "group_name",
-               "age_day",  "dim", "lac_no"]
+               "age_days", "dim", "lac_no"]
+
+# Rename khi load về pipeline: age_days -> age_days
+_RENAME_ON_LOAD = {"age_days": "age_days"}
 
 
 
@@ -84,7 +88,11 @@ def load(snapshot_date: str | None = None) -> pd.DataFrame | None:
         if "no" in df.columns:
             df["no"] = strip_dot_zero(df["no"])
 
-        print(f"   ✅ DB loaded: snapshot {target_date} | {len(df):,} rows")
+        # Rename age_days -> age_days (total_herd.parquet dùng age_days,
+        # pipeline này dùng age_days để nhất quán)
+        df = df.rename(columns={k: v for k, v in _RENAME_ON_LOAD.items() if k in df.columns})
+
+        print(f"   DB loaded: snapshot {target_date} | {len(df):,} rows")
         return df
 
     except Exception as e:

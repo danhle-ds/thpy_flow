@@ -14,7 +14,7 @@ import matplotlib.pyplot as plt
 import pandas as pd
 
 from config.paths import WEIGHT_PARQUET, TEMP_CHART_DIR
-from config.settings import IS_DRY_RUN
+from config.settings import IS_DRY_RUN, TELEGRAM_ENABLED
 from core.transform.business.classifier import add_animal_type
 from utils.logger import log
 from utils.console import vprint
@@ -186,7 +186,7 @@ def run() -> dict:
         return {"status": "completed", "dry_run": True, "chart": str(chart_path)}
 
     sent = False
-    if tg.BOT_TOKEN and tg.CHAT_DAILY:
+    if TELEGRAM_ENABLED and tg.BOT_TOKEN and tg.CHAT_DAILY:
         sent = tg.send_telegram_photo(tg.CHAT_DAILY, chart_path, caption)
     else:
         print("WARNING: Telegram credentials chua set")
@@ -194,7 +194,7 @@ def run() -> dict:
     if sent and chart_path.exists():
         chart_path.unlink()
 
-    if sent and tg.CHAT_INFO:
+    if TELEGRAM_ENABLED and sent and tg.CHAT_INFO:
         tg.send_telegram_message(
             tg.CHAT_INFO,
             f"<b>daily_report</b> hoan tat\n"

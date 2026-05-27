@@ -10,7 +10,7 @@ from datetime import datetime
 
 from config.paths import raw_device_dir
 from config.constants import GALLAGHER_DEVICE
-from config.settings import IS_DRY_RUN, DEVICE_ENABLED, DOWNLOAD_ONLY
+from config.settings import IS_DRY_RUN, DEVICE_ENABLED, DOWNLOAD_ONLY, TELEGRAM_ENABLED
 from core.ingest.gallagher_collector import collect_new_sessions
 from core.load.raw_gallagher_writer import get_downloaded_ids
 from core.load.raw_gallagher_writer import write_sessions
@@ -167,7 +167,7 @@ def run() -> dict:
         f"sessions={len(new_sessions)} | herd={herd_source} | "
         f"new={len(df_final)} | master={len(df_master)}")
 
-    if not IS_DRY_RUN and tg.BOT_TOKEN and tg.CHAT_INFO:
+    if not IS_DRY_RUN and TELEGRAM_ENABLED and tg.BOT_TOKEN and tg.CHAT_INFO:
         tg.send_telegram_message(
             tg.CHAT_INFO,
             f"✅ <b>gallagher_weight</b> hoàn tất\n"

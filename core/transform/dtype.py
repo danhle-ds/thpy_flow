@@ -18,7 +18,8 @@ _STR_COLS = [
     "no", "ear_tag", "group_name", "animal_type",
 ]
 _FLOAT32_COLS = ["weight_kg", "age_month"]
-_INT16_COLS   = ["age_day", "dim"]
+_INT16_COLS   = ["age_days", "dim"]
+_POSITIVE_COLS = ["age_days", "age_month", "dim"]   # âm = lỗi tính, set null
 _INT8_COLS    = ["lac_no"]
 
 
@@ -68,4 +69,10 @@ def standardize_schema(df: pd.DataFrame) -> pd.DataFrame:
     df = df[keep]
 
     print(f"   ✅ Schema chuẩn hóa: {len(df):,} dòng | {list(df.columns)}")
+    # Loại giá trị âm: xảy ra khi herd snapshot lag quá lớn so với ngày cân
+    for c in _POSITIVE_COLS:
+        if c in df.columns:
+            num = pd.to_numeric(df[c], errors='coerce')
+            df.loc[num < 0, c] = pd.NA
+
     return df
