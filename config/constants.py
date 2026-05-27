@@ -74,3 +74,5 @@ GALLAGHER_CLEANUP_BUFFER = 2000
 # ── Weight range dùng cho filter outlier và aggregate CSV ─────────────────────
 WEIGHT_OUTLIER_LOW  = 60.0
 WEIGHT_OUTLIER_HIGH = 900.0
+
+NO_DATA_ALERT_DAYS = 7

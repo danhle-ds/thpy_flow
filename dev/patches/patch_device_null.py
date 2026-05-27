@@ -30,7 +30,7 @@ load_dotenv(_ENV_DIR / "path.env", override=True)
 
 import pandas as pd
 from config.paths import WEIGHT_PARQUET
-from config.settings import DEDUP_KEYS
+from config.constants import DEDUP_KEYS
 
 IS_DRY_RUN = os.getenv("DRY_RUN", "false").lower() in ("true", "1", "yes")
 

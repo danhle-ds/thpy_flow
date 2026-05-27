@@ -6,7 +6,7 @@ import pandas as pd
 import pytest
 
 from core.transform.dtype import standardize_schema
-from config.settings import PARQUET_COL_ORDER
+from config.constants import PARQUET_COL_ORDER
 
 
 def _input_df() -> pd.DataFrame:

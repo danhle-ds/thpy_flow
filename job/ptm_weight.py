@@ -14,8 +14,9 @@ from pathlib import Path
 
 import pandas as pd
 
+from config.constants import PTM_DEVICES
 from config.settings import (
-    N_DAY_RUNNING, PTM_DEVICES, IS_DRY_RUN,
+    N_DAY_RUNNING, IS_DRY_RUN,
     DATE_FROM_OVERRIDE, DATE_TO_OVERRIDE,
     DEVICE_ENABLED, RAW_PARSE_ONLY,
     DOWNLOAD_ONLY

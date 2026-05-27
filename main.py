@@ -34,7 +34,7 @@ import job.monthly_report      as monthly_report_job      # ← mới
 
 from core.load.csv_exporter import export_csv_from_parquet
 from config.paths import WEIGHT_PARQUET
-from config.settings import NO_DATA_ALERT_DAYS
+from config.constants import NO_DATA_ALERT_DAYS
 from utils.outlook_utils import send_html_email
 import utils.telegram_utils as tg
 
