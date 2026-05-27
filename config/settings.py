@@ -7,10 +7,10 @@ from __future__ import annotations
 import os as _os
 
 # ── Run mode ──────────────────────────────────────────────────────────────────
-RUN_MODE   = _os.getenv("RUN_MODE", "production")   # production | dev | dry_run
-IS_PROD    = RUN_MODE == "production"
-IS_DEV     = RUN_MODE == "dev"
-IS_DRY_RUN = RUN_MODE == "dry_run"
+RUN_MODE                = _os.getenv("RUN_MODE", "production")   # production | dev | dry_run
+IS_PROD    = RUN_MODE   == "production"
+IS_DEV     = RUN_MODE   == "dev"
+IS_DRY_RUN = RUN_MODE   == "dry_run"
 
 # ── Fetch window ──────────────────────────────────────────────────────────────
 N_DAY_RUNNING = 7

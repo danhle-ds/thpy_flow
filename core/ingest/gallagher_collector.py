@@ -19,17 +19,23 @@ from pathlib import Path
 
 import pandas as pd
 import requests
-from dotenv import load_dotenv
 
 from config.paths import GALLAGHER_TOKEN_FILE, GALLAGHER_STATE_FILE
 from config.constants import GALLAGHER_BASE, GALLAGHER_AUTH_URL, GALLAGHER_DEVICE
 from utils.string_utils import safe_filename
 from utils.console import vprint
 
-load_dotenv(Path(r"D:\PYTHON_TOOLS\env\account.env"), override=True)
-_FARM_ID     = os.getenv("GALLAGHER_FARM_ID")
-_USERNAME    = os.getenv("GALLAGHER_USERNAME")
-_PASSWORD    = os.getenv("GALLAGHER_PASSWORD")
+# Đọc lazy trong _login() để đảm bảo env đã được load trước
+def _get_creds() -> tuple[str, str, str]:
+    farm_id  = os.getenv("GALLAGHER_FARM_ID", "")
+    username = os.getenv("GALLAGHER_USERNAME", "")
+    password = os.getenv("GALLAGHER_PASSWORD", "")
+    if not all([farm_id, username, password]):
+        raise EnvironmentError(
+            "Thiếu GALLAGHER_FARM_ID / GALLAGHER_USERNAME / GALLAGHER_PASSWORD "
+            "trong account.env"
+        )
+    return farm_id, username, password
 
 
 # ── Retry helper ──────────────────────────────────────────────────────────────
@@ -70,6 +76,7 @@ def _login() -> dict:
     if not m:
         raise RuntimeError("Không tìm được action URL trong login page")
     action_url = m.group(1).replace("&amp;", "&")
+    _FARM_ID, _USERNAME, _PASSWORD = _get_creds()
     r2 = sess.post(action_url, data={"username": _USERNAME, "password": _PASSWORD},
                    allow_redirects=False)
     code = re.search(r"code=([^&]+)", r2.headers.get("location", "")).group(1)
@@ -150,6 +157,7 @@ def _parse_sid(s: dict) -> int | None:
 
 def fetch_all_sessions_stats(page_size: int = 100) -> list[dict]:
     """Lấy toàn bộ sessions từ /stats endpoint (có paginate)."""
+    _FARM_ID, _, _ = _get_creds()
     result, skip = [], 0
     while True:
         def _call(skip=skip):
@@ -171,6 +179,7 @@ def fetch_all_sessions_stats(page_size: int = 100) -> list[dict]:
 
 
 def _fetch_session_detail(session_id: int) -> dict:
+    _FARM_ID, _, _ = _get_creds()
     def _call():
         r = requests.get(
             f"{GALLAGHER_BASE}/v1.1/farms/{_FARM_ID}/sessions/stats/{session_id}",
@@ -183,6 +192,7 @@ def _fetch_session_detail(session_id: int) -> dict:
 
 def _fetch_session_object(uuid: str) -> dict | None:
     """Lấy full object của 1 session theo UUID — cần cho PUT delete."""
+    _FARM_ID, _, _ = _get_creds()
     def _call():
         r = requests.get(
             f"{GALLAGHER_BASE}/v1.1/farms/{_FARM_ID}/sessions",
@@ -272,7 +282,7 @@ def delete_session(session_stats: dict, dry_run: bool) -> bool:
 
     def _put():
         r = requests.put(
-            f"{GALLAGHER_BASE}/v1.1/farms/{_FARM_ID}/sessions",
+            f"{GALLAGHER_BASE}/v1.1/farms/{_get_creds()[0]}/sessions",
             headers=_headers(),
             json=[obj],
             timeout=30,
