@@ -12,6 +12,8 @@ from pathlib import Path
 
 import pandas as pd
 
+from config.paths import PARQUET_BACKUP_DIR
+
 
 
 # ── Parquet ───────────────────────────────────────────────────────────────────
@@ -46,11 +48,15 @@ def atomic_write_csv(
 
 # ── Backup ────────────────────────────────────────────────────────────────────
 def make_backup(target: Path) -> Path | None:
-    """Tạo bản backup trước khi overwrite. Trả về path backup hoặc None."""
+    """
+    Backup target vào PARQUET_BACKUP_DIR/{stem}_bak_{ts}.parquet.
+    Tách khỏi thư mục data để không lẫn với master files.
+    """
     if not target.exists():
         return None
+    PARQUET_BACKUP_DIR.mkdir(parents=True, exist_ok=True)
     ts  = datetime.now().strftime("%Y%m%d_%H%M%S")
-    bak = target.with_name(f"{target.stem}_bak_{ts}{target.suffix}")
+    bak = PARQUET_BACKUP_DIR / f"{target.stem}_bak_{ts}{target.suffix}"
     shutil.copy2(target, bak)
     return bak
 
@@ -60,12 +66,14 @@ def purge_old_backups(
     stem: str,
     max_days: int = _BACKUP_RETENTION_DAYS,
 ) -> None:
-    """Xóa file backup có tên bắt đầu bằng '{stem}_bak_' và cũ hơn max_days ngày."""
+    """Xóa backup cũ hơn max_days ngày trong PARQUET_BACKUP_DIR."""
+    if not PARQUET_BACKUP_DIR.exists():
+        return
     cutoff  = datetime.now() - timedelta(days=max_days)
     removed = 0
-    for f in folder.glob(f"{stem}_bak_*"):
+    for f in PARQUET_BACKUP_DIR.glob(f"{stem}_bak_*"):
         if datetime.fromtimestamp(f.stat().st_mtime) < cutoff:
             f.unlink()
             removed += 1
     if removed:
-        print(f"   🗑️   Purge: xóa {removed} backup cũ hơn {max_days} ngày")
+        print(f"   Purge: xoa {removed} backup cu hon {max_days} ngay")

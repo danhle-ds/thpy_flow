@@ -1,32 +1,51 @@
 """
 core/transform/business/classifier.py
-Phân loại bò dựa trên lac_no (số lứa đẻ).
+Phân loại bò dựa trên mã bò (no) và lac_no (số lứa đẻ).
 """
 from __future__ import annotations
 import pandas as pd
 
 
-def classify_by_lac_no(lac_no) -> str:
+def classify_by_lac_no(no, lac_no) -> str:
     """
-    lac_no >= 1  → 'cow'    (đã đẻ)
-    lac_no <  1  → 'heifer' (chưa đẻ, thường = 0)
-    NaN / lỗi   → 'unknown'
+    Logic phân loại:
+    - Nếu `no` là NaN, rỗng, "nan", "none" -> 'unknown'
+    - Nếu `no` hợp lệ VÀ `lac_no` >= 1    -> 'cow'
+    - Còn lại (bao gồm cả trường hợp lac_no bị lỗi/NaN) -> 'heifer'
     """
+    # 1. Kiểm tra điều kiện mã bò 'no'
+    if pd.isna(no):
+        return "unknown"
+        
+    no_str = str(no).strip().lower()
+    if no_str in ["nan", "none", ""]:
+        return "unknown"
+
+    # 2. Nếu 'no' hợp lệ, kiểm tra 'lac_no'
     if pd.isna(lac_no):
-        return "unknown"
+        return "heifer"  # Theo logic "còn lại heifer" (gồm cả lac_no lỗi)
+        
     try:
-        return "cow" if float(lac_no) >= 1 else "heifer"
+        val = float(lac_no)
+        if val >= 1:
+            return "cow"
+        else:
+            return "heifer"
     except (ValueError, TypeError):
-        return "unknown"
+        # Nếu lac_no là chuỗi lỗi không cast được sang số, rơi vào trường hợp "còn lại"
+        return "heifer"
 
 
-def add_animal_type(df: pd.DataFrame, lac_col: str = "lac_no") -> pd.DataFrame:
+def add_animal_type(df: pd.DataFrame, no_col: str = "no", lac_col: str = "lac_no") -> pd.DataFrame:
     df = df.copy()
-    if lac_col in df.columns:
-        df["animal_type"] = df[lac_col].apply(classify_by_lac_no)
+    if no_col in df.columns and lac_col in df.columns:
+        # Sử dụng lambda để truyền cả 2 cột vào hàm phân loại
+        df["animal_type"] = df.apply(
+            lambda row: classify_by_lac_no(row[no_col], row[lac_col]), axis=1
+        )
     else:
         df["animal_type"] = "unknown"
 
     counts = df["animal_type"].value_counts().to_dict()
-    print(f"   Classify lac_no: {counts}")
+    print(f"   Classify animal_type: {counts}")
     return df

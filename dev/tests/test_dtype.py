@@ -21,7 +21,7 @@ def _input_df() -> pd.DataFrame:
         "animal_type":["cow"],
         "weight":     [500.0],          # rename → weight_kg
         "age_month":  [24.0],
-        "age_days":   [730],
+        "age_day":   [730],
         "dim":        [45],
         "lac_no":     [2],
     })
@@ -47,9 +47,9 @@ class TestStandardizeSchema:
         df = standardize_schema(_input_df())
         assert df["weight_kg"].dtype.name == "float32"
 
-    def test_age_days_int16(self):
+    def test_age_day_int16(self):
         df = standardize_schema(_input_df())
-        assert df["age_days"].dtype.name == "Int16"
+        assert df["age_day"].dtype.name == "Int16"
 
     def test_dim_int16(self):
         df = standardize_schema(_input_df())

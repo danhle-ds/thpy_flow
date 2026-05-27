@@ -18,7 +18,7 @@ _STR_COLS = [
     "no", "ear_tag", "group_name", "animal_type",
 ]
 _FLOAT32_COLS = ["weight_kg", "age_month"]
-_INT16_COLS   = ["age_days", "dim"]
+_INT16_COLS   = ["age_day", "dim"]
 _INT8_COLS    = ["lac_no"]
 
 

@@ -36,20 +36,18 @@ load_dotenv(_ENV_DIR / "path.env", override=True)
 
 import pandas as pd
 
-from config.paths import WEIGHT_PARQUET
-from core.transform.business.classifier import classify_by_lac_no
+from config.paths import WEIGHT_PARQUET, PARQUET_BACKUP_DIR
+from core.transform.business.classifier import add_animal_type
 
 IS_DRY_RUN = os.getenv("DRY_RUN", "false").lower() in ("true", "1", "yes")
 
 
 def _reclassify(df: pd.DataFrame) -> pd.DataFrame:
-    """Re-derive animal_type tu lac_no. Khong dung mapping thu cong."""
-    df = df.copy()
+    """Re-derive animal_type tu no + lac_no."""
     if "lac_no" not in df.columns:
         print("WARNING: Khong co cot lac_no — animal_type giu nguyen")
         return df
-    df["animal_type"] = pd.to_numeric(df["lac_no"], errors="coerce").apply(classify_by_lac_no)
-    return df
+    return add_animal_type(df)
 
 
 def run():
@@ -91,9 +89,8 @@ def run():
         return
 
     # ── Backup + atomic write ─────────────────────────────────────────────────
-    backup = WEIGHT_PARQUET.with_name(
-        f"{WEIGHT_PARQUET.stem}_before_patch_{datetime.now().strftime('%Y%m%d_%H%M%S')}.parquet"
-    )
+    PARQUET_BACKUP_DIR.mkdir(parents=True, exist_ok=True)
+    backup = PARQUET_BACKUP_DIR / f"{WEIGHT_PARQUET.stem}_before_patch_{datetime.now().strftime('%Y%m%d_%H%M%S')}.parquet"
     import shutil
     shutil.copy2(WEIGHT_PARQUET, backup)
     print(f"\nBackup: {backup.name}")

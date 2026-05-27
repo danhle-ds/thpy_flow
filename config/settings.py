@@ -13,7 +13,7 @@ IS_DEV     = RUN_MODE   == "dev"
 IS_DRY_RUN = RUN_MODE   == "dry_run"
 
 # ── Fetch window ──────────────────────────────────────────────────────────────
-N_DAY_RUNNING = 7
+N_DAY_RUNNING = 169
 
 # ── Backfill: override date range qua env var ─────────────────────────────────
 # PowerShell: $env:DATE_FROM="2026-04-17"; $env:DATE_TO="2026-04-28"; python main.py
@@ -31,7 +31,7 @@ DEVICE_ENABLED: dict[str, bool] = {
 }
 
 # RAW_PARSE_ONLY: đọc raw CSV cũ, không gọi API
-RAW_PARSE_ONLY = _bool_env("RAW_PARSE_ONLY", False)
+RAW_PARSE_ONLY = _bool_env("RAW_PARSE_ONLY", True)
 
 # DOWNLOAD_ONLY: chỉ tải → lưu raw CSV → dừng, không transform
 DOWNLOAD_ONLY  = _bool_env("DOWNLOAD_ONLY", False)

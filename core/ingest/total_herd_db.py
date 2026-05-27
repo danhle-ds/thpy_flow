@@ -15,7 +15,7 @@ from utils.id_utils import strip_dot_zero
 
 # ── Cột cần trả về ────────────────────────────────────────────────────────────
 _MERGE_COLS = ["no", "transp_2", "group_name",
-               "age_days", "age_month_fix", "dim", "lac_no"]
+               "age_day",  "dim", "lac_no"]
 
 
 

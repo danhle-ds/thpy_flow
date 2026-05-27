@@ -57,6 +57,8 @@ JOB_NAME  = "API_WEIGHT"
 
 # ── Parquet master ────────────────────────────────────────────────────────────
 WEIGHT_PARQUET     = DATA_MARK / DEPT_NAME / JOB_NAME / "weight_db_api.parquet"
+PARQUET_BACKUP_DIR = LOCAL_OUT_DIR / "DATABASE" / "tmp" / DEPT_NAME / JOB_NAME
+
 TOTAL_HERD_PARQUET = (
     LOCAL_OUT_DIR / "DATA_WARE_HOUSE" / "DATA_MARK_THPY" / "INFO_HERD" / "total_herd.parquet"
 )

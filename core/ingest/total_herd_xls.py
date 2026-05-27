@@ -25,7 +25,7 @@ from utils.schema_loader import get_col_mapping, get_strip_dot_zero_cols, get_xl
 
 # ── Cột cần trả về ────────────────────────────────────────────────────────────
 _MERGE_COLS = ["no", "transp_2", "group_name",
-               "age_days", "age_month_fix", "dim", "lac_no"]
+               "age_day",  "dim", "lac_no"]
 
 
 
@@ -83,9 +83,6 @@ def load_xls(path: Path) -> pd.DataFrame | None:
         if "no" in df.columns:
             df["no"] = strip_dot_zero(df["no"])
 
-        # ── Step 6: age_month_fix fallback ───────────────────────────────────
-        if "age_month_fix" not in df.columns and "age_months_raw" in df.columns:
-            df["age_month_fix"] = pd.to_numeric(df["age_months_raw"], errors="coerce")
 
         df["date"] = date.today().strftime("%Y-%m-%d")
 

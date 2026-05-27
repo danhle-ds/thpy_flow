@@ -15,7 +15,7 @@ import pandas as pd
 
 from config.paths import WEIGHT_PARQUET, TEMP_CHART_DIR
 from config.settings import IS_DRY_RUN
-from core.transform.business.classifier import classify_by_lac_no
+from core.transform.business.classifier import add_animal_type
 from utils.logger import log
 from utils.console import vprint
 import utils.telegram_utils as tg
@@ -47,15 +47,10 @@ def _load_today(today_str: str) -> pd.DataFrame | None:
 # ── Classify rows từ parquet theo lac_no ──────────────────────────────────────
 def _add_type_col(df: pd.DataFrame) -> pd.DataFrame:
     """
-    Dùng classify_by_lac_no thay vì đọc cột animal_type trực tiếp từ parquet —
-    đảm bảo legacy rows có giá trị cũ (milking_cow, dry...) vẫn được chart đúng.
+    Re-classify từ no + lac_no để legacy rows (milking_cow, dry...) được chart đúng.
     """
-    df = df.copy()
-    lac_col = "lac_no" if "lac_no" in df.columns else None
-    if lac_col:
-        df["_type"] = df[lac_col].apply(classify_by_lac_no)
-    else:
-        df["_type"] = "unknown"
+    df = add_animal_type(df.copy())
+    df["_type"] = df["animal_type"]
     return df
 
 

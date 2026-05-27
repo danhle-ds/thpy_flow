@@ -4,7 +4,7 @@ Orchestrator load Total Herd — thứ tự ưu tiên:
   1. XLS hôm nay trên OneDrive   (core/ingest/total_herd_xls.py)
   2. Parquet DB snapshot mới nhất (core/ingest/total_herd_db.py)
 
-Logic nghiệp vụ (normalize, fallback age_month_fix) nằm hoàn toàn
+Logic nghiệp vụ (normalize, tinh age_month tu age_day) nằm hoàn toàn
 trong ingest modules. File này chỉ orchestrate.
 """
 from __future__ import annotations

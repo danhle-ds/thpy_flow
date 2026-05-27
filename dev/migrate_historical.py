@@ -30,7 +30,7 @@ import pandas as pd
 
 from config.paths import WEIGHT_PARQUET, CSV_LEGACY_DIR
 from config.constants import PARQUET_COL_ORDER
-from core.transform.business.classifier import classify_by_lac_no
+from core.transform.business.classifier import add_animal_type
 
 SRC_CSV = CSV_LEGACY_DIR / "DATA_MERGE_COW_ID.csv"
 
@@ -83,11 +83,7 @@ def migrate():
     # Phan loai dua tren lac_no (khong dung group_name nua).
     # Du lieu cu co the chua co lac_no — khi do classify ra "unknown".
     # Neu muon giu lai gia tri animal_type cu, bo dong nay di.
-    if "lac_no" in df.columns:
-        lac_numeric = pd.to_numeric(df["lac_no"], errors="coerce")
-        df["animal_type"] = lac_numeric.apply(classify_by_lac_no)
-    else:
-        df["animal_type"] = "unknown"
+    df = add_animal_type(df)
     print(f"animal_type: {df['animal_type'].value_counts().to_dict()}")
 
     df["loaded_at"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
@@ -97,8 +93,9 @@ def migrate():
             df[col] = _strip_dot_zero(df[col])
 
     df["weight_kg"] = pd.to_numeric(df.get("weight_kg"), errors="coerce").astype("float32")
-    df["age_month"] = pd.to_numeric(df.get("age_month"), errors="coerce").astype("float32")
-    df["age_days"]  = pd.to_numeric(df.get("age_days"),  errors="coerce").astype("Int16")
+    # round(1) để nhất quán với herd_merger: age_month = round(age_day/30.44, 1)
+    df["age_month"] = pd.to_numeric(df.get("age_month"), errors="coerce").round(1).astype("float32")
+    df["age_day"]  = pd.to_numeric(df.get("age_day"),  errors="coerce").astype("Int16")
     df["dim"]       = pd.to_numeric(df.get("dim"),       errors="coerce").astype("Int16")
     df["lac_no"]    = pd.to_numeric(df.get("lac_no"),    errors="coerce").astype("Int8")
 
@@ -111,6 +108,14 @@ def migrate():
     print(f"\nSchema sau migrate:\n{df.dtypes.to_string()}")
     nulls = df.isnull().sum()
     print(f"\nNull counts:\n{nulls[nulls > 0].to_string() if nulls.any() else '(khong co null)'}")
+
+    # Round age_month trong parquet cu (neu da ton tai) truoc khi ghi de
+    if WEIGHT_PARQUET.exists() and input("   Round age_month parquet hien tai? (yes/no): ").strip().lower() == 'yes':
+        _existing = pd.read_parquet(WEIGHT_PARQUET)
+        if 'age_month' in _existing.columns:
+            _existing['age_month'] = _existing['age_month'].round(1).astype('float32')
+            _existing.to_parquet(WEIGHT_PARQUET, index=False, engine='pyarrow')
+            print(f'   Round age_month: {len(_existing):,} rows')
 
     if WEIGHT_PARQUET.exists():
         print(f"\nWARNING: Parquet da ton tai: {WEIGHT_PARQUET}")

@@ -29,7 +29,7 @@ _ENV_DIR = Path(os.getenv("PYTHON_TOOLS_ENV", r"D:\PYTHON_TOOLS\env"))
 load_dotenv(_ENV_DIR / "path.env", override=True)
 
 import pandas as pd
-from config.paths import WEIGHT_PARQUET
+from config.paths import WEIGHT_PARQUET, PARQUET_BACKUP_DIR
 from config.constants import DEDUP_KEYS
 
 IS_DRY_RUN = os.getenv("DRY_RUN", "false").lower() in ("true", "1", "yes")
@@ -37,6 +37,7 @@ IS_DRY_RUN = os.getenv("DRY_RUN", "false").lower() in ("true", "1", "yes")
 # Map source -> default device khi khong ro device cu the
 _SOURCE_DEVICE_DEFAULT = {
     "PTM":       "CIMA1",      # device pho bien nhat, co the chinh lai
+    "PTM":       "CIMA2",
     "GALLAGHER": "GALLAGHER_1",
 }
 
@@ -105,9 +106,8 @@ def run():
         print("\nDRY RUN: preview OK")
         return
 
-    backup = WEIGHT_PARQUET.with_name(
-        f"{WEIGHT_PARQUET.stem}_before_device_patch_{datetime.now().strftime('%Y%m%d_%H%M%S')}.parquet"
-    )
+    PARQUET_BACKUP_DIR.mkdir(parents=True, exist_ok=True)
+    backup = PARQUET_BACKUP_DIR / f"{WEIGHT_PARQUET.stem}_before_device_patch_{datetime.now().strftime('%Y%m%d_%H%M%S')}.parquet"
     shutil.copy2(WEIGHT_PARQUET, backup)
     print(f"\nBackup: {backup.name}")
 

@@ -1,6 +1,7 @@
 """
 core/transform/business/herd_merger.py
-Merge weight data voi herd info, dieu chinh Age/DIM ve ngay can thuc te.
+Merge weight data voi herd info.
+age_month = round((age_day - day_diff) / 30.44, 1)  — nhat quan, khong dung age_month_fix.
 """
 from __future__ import annotations
 from datetime import date
@@ -17,15 +18,15 @@ def merge_with_herd(
     """
     Left join weight_df (ear_tag) <-> herd_df (transp_2).
 
-    Adjustment logic:
-      age_days / dim: lay tu herd snapshot roi tru day_diff de ve ngay can.
-      age_month     : lay age_month_fix truc tiep — column nay da duoc
-                      db_saver_total_herd tinh chinh xac cho truong hop
-                      DB bi tre (lag). Khong tru them day_diff.
+    Adjustment:
+      day_diff  = herd_snapshot_date - weight_date
+      age_day   = age_day_herd  - day_diff
+      dim       = dim_herd      - day_diff
+      age_month = round(age_day / 30.44, 1)   <- sau khi da tru day_diff
     """
     if herd_df is None:
         print("   WARNING: Khong co herd data — cac cot herd se la null")
-        for c in ["no", "group_name", "age_days", "age_month", "dim", "lac_no"]:
+        for c in ["no", "group_name", "age_day", "age_month", "dim", "lac_no"]:
             weight_df[c] = None
         return weight_df
 
@@ -39,7 +40,8 @@ def merge_with_herd(
 
     df["_date_parsed"] = pd.to_datetime(df["date"], format="%Y-%m-%d", errors="coerce")
 
-    herd_cols = ["no", "transp_2", "group_name", "age_days", "age_month_fix", "dim", "lac_no"]
+    # age_month_fix khong dung nua — chi lay age_day de tinh lai
+    herd_cols = ["no", "transp_2", "group_name", "age_day", "dim", "lac_no"]
     herd_sub  = herd_df[[c for c in herd_cols if c in herd_df.columns]].copy()
 
     df["ear_tag"]        = strip_dot_zero(df["ear_tag"])
@@ -50,34 +52,30 @@ def merge_with_herd(
         how="left", suffixes=("", "_herd"),
     )
 
-    # ── age_days / dim: tru day_diff ve ngay can ──────────────────────────────
+    # ── day_diff ──────────────────────────────────────────────────────────────
     match_mask = merged["no"].notna()
     merged.loc[match_mask, "_day_diff"] = (
         herd_snapshot - merged.loc[match_mask, "_date_parsed"]
     ).dt.days
 
-    for col in ["age_days", "dim"]:
+    # ── age_day + dim: tru day_diff ───────────────────────────────────────────
+    for col in ["age_day", "dim"]:
         if col in merged.columns:
             merged.loc[match_mask, col] = (
                 pd.to_numeric(merged.loc[match_mask, col], errors="coerce")
                 - merged.loc[match_mask, "_day_diff"]
             )
 
-    # ── age_month: dung age_month_fix truc tiep ───────────────────────────────
-    # age_month_fix da duoc db_saver_total_herd tinh chinh xac cho ca XLS
-    # (hom nay) lan DB lag (1-4 ngay). Khong tru them day_diff o day.
-    if "age_month_fix" in merged.columns:
-        merged["age_month"] = pd.to_numeric(merged["age_month_fix"], errors="coerce")
+    # ── age_month: tinh thuan tuy tu age_day da adjust ────────────────────────
+    if "age_day" in merged.columns:
+        merged["age_month"] = (
+            pd.to_numeric(merged["age_day"], errors="coerce") / 30.44
+        ).round(1)
     else:
         merged["age_month"] = None
 
-    fallback_mask = merged["age_month"].isna() & merged["age_days"].notna()
-    merged.loc[fallback_mask, "age_month"] = (
-        pd.to_numeric(merged.loc[fallback_mask, "age_days"], errors="coerce") / 30.44
-    ).round(1)
-
     merged = merged.drop(
-        columns=["transp_2", "_date_parsed", "_day_diff", "age_month_fix"],
+        columns=["transp_2", "_date_parsed", "_day_diff"],
         errors="ignore",
     )
 

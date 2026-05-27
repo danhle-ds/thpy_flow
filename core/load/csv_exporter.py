@@ -24,7 +24,7 @@ def _build_monthly_aggregate(df: pd.DataFrame) -> pd.DataFrame:
 
     weight_kg : mean cua cac gia tri trong [WEIGHT_OUTLIER_LOW, WEIGHT_OUTLIER_HIGH]
     age_month : max (so thang lon nhat trong thang — gan ngay cuoi nhat)
-    age_days  : max, Int (so nguyen)
+    age_day  : max, Int (so nguyen)
     dim       : max, Int
     lac_no    : max, Int
     group_name: last (nhom cuoi cung trong thang)
@@ -46,7 +46,7 @@ def _build_monthly_aggregate(df: pd.DataFrame) -> pd.DataFrame:
     agg = d.groupby(["year_month", "no"], as_index=False).agg(
         weight_kg   = ("weight_for_agg", "mean"),
         age_month   = ("age_month",      "max"),
-        age_days    = ("age_days",        "max"),
+        age_day    = ("age_day",        "max"),
         dim         = ("dim",             "max"),
         lac_no      = ("lac_no",          "max"),
         group_name  = ("group_name",      "last"),
@@ -55,7 +55,7 @@ def _build_monthly_aggregate(df: pd.DataFrame) -> pd.DataFrame:
 
     agg["weight_kg"] = agg["weight_kg"].round(1)
     agg["age_month"] = agg["age_month"].round(1)
-    for col in ["age_days", "dim", "lac_no"]:
+    for col in ["age_day", "dim", "lac_no"]:
         if col in agg.columns:
             agg[col] = pd.to_numeric(agg[col], errors="coerce").round(0).astype("Int16")
 

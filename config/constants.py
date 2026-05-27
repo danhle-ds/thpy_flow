@@ -27,7 +27,7 @@ PARQUET_COL_ORDER = [
     "no", "ear_tag",
     "group_name", "animal_type",
     "weight_kg",
-    "age_month", "age_days",
+    "age_month", "age_day",
     "dim", "lac_no",
     "loaded_at",
 ]
