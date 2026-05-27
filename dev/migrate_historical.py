@@ -42,7 +42,7 @@ def _infer_source(device: str) -> str:
     return "PTM"
 
 
-def _normalize_id(s: pd.Series) -> pd.Series:
+def _strip_dot_zero(s: pd.Series) -> pd.Series:
     return (
         s.astype(str).str.strip()
         .str.replace(r"\.0$", "", regex=True)
@@ -94,7 +94,7 @@ def migrate():
 
     for col in ["no", "ear_tag"]:
         if col in df.columns:
-            df[col] = _normalize_id(df[col])
+            df[col] = _strip_dot_zero(df[col])
 
     df["weight_kg"] = pd.to_numeric(df.get("weight_kg"), errors="coerce").astype("float32")
     df["age_month"] = pd.to_numeric(df.get("age_month"), errors="coerce").astype("float32")

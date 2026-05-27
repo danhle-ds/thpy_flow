@@ -7,7 +7,7 @@ from datetime import date
 
 import pandas as pd
 
-from utils.id_utils import normalize_id
+from utils.id_utils import strip_dot_zero
 
 
 
@@ -44,8 +44,8 @@ def merge_with_herd(
     # Normalize ca hai phia ve cung dang truoc khi join.
     # Herd side co the da duoc normalize boi ingest module, nhung ap dung lai
     # dam bao nhat quan khi XLS source khong normalize truoc.
-    df["ear_tag"]        = normalize_id(df["ear_tag"])
-    herd_sub["transp_2"] = normalize_id(herd_sub["transp_2"])
+    df["ear_tag"]        = strip_dot_zero(df["ear_tag"])
+    herd_sub["transp_2"] = strip_dot_zero(herd_sub["transp_2"])
 
     merged = df.merge(
         herd_sub, left_on="ear_tag", right_on="transp_2",

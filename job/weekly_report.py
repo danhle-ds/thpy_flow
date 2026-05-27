@@ -1,6 +1,6 @@
 """
 job/weekly_report.py
-Gửi báo cáo cân bò tơ hàng tuần qua Outlook HTML email.
+Gửi báo cáo cân bò tơ hàng tuần qua Outlook.
 Chạy vào mỗi thứ 6 (được kiểm soát từ main.py).
 
 Logic:

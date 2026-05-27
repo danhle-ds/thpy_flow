@@ -11,7 +11,7 @@ import duckdb
 import pandas as pd
 
 from config.paths import TOTAL_HERD_PARQUET
-from utils.id_utils import normalize_id
+from utils.id_utils import strip_dot_zero
 
 # ── Cột cần trả về ────────────────────────────────────────────────────────────
 _MERGE_COLS = ["no", "transp_2", "group_name",
@@ -80,9 +80,9 @@ def load(snapshot_date: str | None = None) -> pd.DataFrame | None:
 
         # ── Normalize ─────────────────────────────────────────────────────────
         if "transp_2" in df.columns:
-            df["transp_2"] = normalize_id(df["transp_2"])
+            df["transp_2"] = strip_dot_zero(df["transp_2"])
         if "no" in df.columns:
-            df["no"] = normalize_id(df["no"])
+            df["no"] = strip_dot_zero(df["no"])
 
         print(f"   ✅ DB loaded: snapshot {target_date} | {len(df):,} rows")
         return df

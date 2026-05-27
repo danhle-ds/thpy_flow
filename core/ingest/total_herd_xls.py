@@ -20,7 +20,7 @@ from pathlib import Path
 import pandas as pd
 
 from config.paths import TOTAL_HERD_XLS_DIR
-from utils.id_utils import normalize_id
+from utils.id_utils import strip_dot_zero
 from utils.schema_loader import get_col_mapping, get_strip_dot_zero_cols, get_xls_to_snake
 
 # ── Cột cần trả về ────────────────────────────────────────────────────────────
@@ -33,17 +33,20 @@ _MERGE_COLS = ["no", "transp_2", "group_name",
 # ── Tìm file XLS hôm nay ─────────────────────────────────────────────────────
 def find_today_xls() -> Path | None:
     """
-    Scan TOTAL_HERD_XLS_DIR tìm file XLS có mtime = hôm nay.
-    Lấy file mới nhất nếu có nhiều.
+    Tìm file Total herd (no edit).xls mới nhất trong folder falback.
     """
     if not TOTAL_HERD_XLS_DIR.exists():
         return None
+    
+    target_file = TOTAL_HERD_XLS_DIR / "Total Herd (No Edit).xls"
+    if not target_file.exists():
+        return None
+        
+    # Kiểm tra ngày cập nhật (giữ nguyên logic so sánh chuỗi ngày của bạn)
     today_str = date.today().strftime("%Y-%m-%d")
-    candidates = [
-        f for f in TOTAL_HERD_XLS_DIR.glob("*.xls*")
-        if datetime.fromtimestamp(f.stat().st_mtime).strftime("%Y-%m-%d") == today_str
-    ]
-    return max(candidates, key=lambda f: f.stat().st_mtime) if candidates else None
+    file_date_str = datetime.fromtimestamp(target_file.stat().st_mtime).strftime("%Y-%m-%d")
+    
+    return target_file if file_date_str == today_str else None
 
 
 # ── Load + parse XLS ──────────────────────────────────────────────────────────
@@ -64,7 +67,7 @@ def load_xls(path: Path) -> pd.DataFrame | None:
         # ── Step 2: Strip .0 cho cột ID trước khi đổi tên ────────────────────
         for raw_col in get_strip_dot_zero_cols():   # ["No.", "Sire #", "Dam #", ...]
             if raw_col in df.columns:
-                df[raw_col] = normalize_id(df[raw_col])
+                df[raw_col] = strip_dot_zero(df[raw_col])
 
         # ── Step 3: XLS header → snake_case ──────────────────────────────────
         xls_map = get_xls_to_snake()
@@ -72,13 +75,13 @@ def load_xls(path: Path) -> pd.DataFrame | None:
 
         # ── Step 4: Normalize transp_2 (cùng logic cleaner.py) ───────────────
         if "transp_2" in df.columns:
-            df["transp_2"] = normalize_id(df["transp_2"])
+            df["transp_2"] = strip_dot_zero(df["transp_2"])
         else:
             print(f"   ⚠️  XLS '{path.name}': không có cột transp_2 sau map")
 
         # ── Step 5: no normalize ──────────────────────────────────────────────
         if "no" in df.columns:
-            df["no"] = normalize_id(df["no"])
+            df["no"] = strip_dot_zero(df["no"])
 
         # ── Step 6: age_month_fix fallback ───────────────────────────────────
         if "age_month_fix" not in df.columns and "age_months_raw" in df.columns:

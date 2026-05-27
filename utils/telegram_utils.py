@@ -17,9 +17,6 @@ from pathlib import Path
 
 import requests
 
-# Khong goi load_dotenv o day — env da duoc load boi main.py truoc khi import.
-# Neu can chay standalone, goi load_dotenv ben ngoai truoc khi import module nay.
-
 # ── Token & Chat IDs ──────────────────────────────────────────────────────────
 BOT_TOKEN    = os.getenv("TELEGRAM_BOT_TOKEN_INFOR", "")
 

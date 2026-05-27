@@ -28,14 +28,14 @@ from pathlib import Path
 import duckdb
 import pandas as pd
 
-from config.constants import AGE_GROUPS, PARQUET_COL_ORDER
+from config.constants import AGE_GROUPS, PARQUET_COL_ORDER, PTM_DEVICES
+from config.settings import IS_DRY_RUN, DEVICE_ENABLED
 from config.paths import (
     TOTAL_HERD_PARQUET,
     WEIGHT_PARQUET,
     MONTHLY_UA_DIR,
     raw_device_dir,
 )
-from config.settings import IS_DRY_RUN, PTM_DEVICES, DEVICE_ENABLED
 from core.transform.structural.parser import parse_ptm_df
 from utils.logger import log
 from utils.outlook_utils import send_html_email

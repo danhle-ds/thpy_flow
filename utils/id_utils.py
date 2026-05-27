@@ -7,7 +7,7 @@ from __future__ import annotations
 import pandas as pd
 
 
-def normalize_id(s: pd.Series) -> pd.Series:
+def strip_dot_zero(s: pd.Series) -> pd.Series:
     """
     strip → bỏ '.0' suffix → xử lý scientific notation → bỏ leading zeros → cast object.
 

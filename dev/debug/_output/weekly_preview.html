@@ -1,0 +1,244 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Báo cáo cân bò tơ tuần — PYHTF</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif;
+    background: #f4f6f8;
+    color: #212529;
+    padding: 20px;
+  }
+  .wrapper {
+    max-width: 700px;
+    margin: 0 auto;
+    background: #ffffff;
+    border-radius: 8px;
+    overflow: hidden;
+    box-shadow: 0 4px 12px rgba(0,0,0,.05);
+  }
+  /* Header tinh giản, chuyên nghiệp */
+  .header {
+    background: #0f4c81;
+    padding: 24px 32px;
+    color: #ffffff;
+  }
+  .header h1 { font-size: 20px; font-weight: 600; margin: 0 0 4px 0; }
+  .header .sub { font-size: 13px; opacity: .8; }
+
+  .section { padding: 24px 32px; }
+  .section + .section { border-top: 1px solid #edf2f7; }
+  h2 { font-size: 14px; font-weight: 700; color: #4a5568; margin-bottom: 16px; text-transform: uppercase; letter-spacing: 0.5px; }
+
+  /* Thẻ tóm tắt tinh gọn */
+  .summary-row {
+    display: table;
+    width: 100%;
+    table-layout: fixed;
+    border-collapse: separate;
+    border-spacing: 12px 0;
+    margin: 0 -12px;
+  }
+  .stat-card {
+    display: table-cell;
+    background: #f7fafc;
+    border: 1px solid #e2e8f0;
+    border-radius: 6px;
+    padding: 14px;
+    text-align: center;
+    vertical-align: middle;
+  }
+  .stat-card .val { font-size: 22px; font-weight: 700; color: #0f4c81; }
+  .stat-card .lbl { font-size: 11px; color: #718096; margin-top: 4px; line-height: 1.3; }
+
+  /* Bảng gộp trung tâm */
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  thead th {
+    background: #f7fafc;
+    color: #4a5568;
+    padding: 12px;
+    text-align: left;
+    font-weight: 600;
+    border-bottom: 2px solid #e2e8f0;
+  }
+  tbody td { padding: 12px; border-bottom: 1px solid #edf2f7; vertical-align: middle; }
+  tbody tr:hover { background: #f8fafc; }
+
+  /* Thanh tiến độ mini */
+  .bar-container { display: inline-block; width: 60px; height: 6px; background: #e2e8f0; border-radius: 3px; overflow: hidden; vertical-align: middle; margin-right: 6px; }
+  
+  /* Ép thuộc tính width của thẻ div nhận giá trị phần trăm */
+  .bar-fill { display: block; height: 100%; border-radius: 3px; }
+  
+  .bg-ok { background-color: #38a169; }
+  .bg-warn { background-color: #dd6b20; }
+  .bg-bad { background-color: #e53e3e; }
+
+  .text-ok { color: #38a169; font-weight: bold; }
+  .text-warn { color: #dd6b20; font-weight: bold; }
+  .text-bad { color: #e53e3e; font-weight: bold; }
+
+  .sub-info { font-size: 11px; color: #a0aec0; display: block; margin-top: 2px; }
+
+  /* Banner cảnh báo mượt hơn */
+  .warning-banner {
+    background: #fffaf0;
+    border-left: 4px solid #dd6b20;
+    padding: 14px 16px;
+    font-size: 13px;
+    color: #7b341e;
+    border-radius: 4px;
+  }
+
+  .footer { background: #f7fafc; padding: 16px 32px; font-size: 11px; color: #a0aec0; text-align: center; border-top: 1px solid #edf2f7; }
+</style>
+</head>
+<body>
+<div class="wrapper">
+
+  <div class="header">
+    <h1>🐄 Báo cáo cân bò tơ — Tuần 4/05/2026</h1>
+    <div class="sub">Trang trại PYHTF &nbsp;·&nbsp; Kỳ giám sát: 01/05/2026 → 27/05/2026</div>
+  </div>
+
+  <div class="section">
+    <div class="summary-row">
+      <div class="stat-card">
+        <div class="val">0</div>
+        <div class="lbl">Đã cân<br>(Distinct)</div>
+      </div>
+      <div class="stat-card">
+        <div class="val">3</div>
+        <div class="lbl">Lứa tuổi<br>Theo dõi</div>
+      </div>
+      <div class="stat-card">
+        <div class="val">30.0%</div>
+        <div class="lbl">Ngưỡng tối thiểu<br>(Tuần 4)</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="section">
+    <h2>📊 Chi tiết chỉ số theo lứa tuổi</h2>
+    <table>
+      <thead>
+        <tr>
+          <th>Lứa tuổi</th>
+          <th style="text-align: right;">Kế hoạch</th>
+          <th style="text-align: right;">Thực tế</th>
+          <th style="width: 140px;">Tỷ lệ Coverage</th>
+          <th style="text-align: right;">Cân nặng TB</th>
+        </tr>
+      </thead>
+      <tbody>
+        
+        
+        
+        <tr>
+          <td><strong>6 tháng</strong></td>
+          <td style="text-align: right; color: #4a5568;">159</td>
+          <td style="text-align: right; font-weight: 500;">0</td>
+          <td>
+            <div style="white-space: nowrap;">
+              <div class="bar-container">
+                <div class="bar-fill bg-bad" 
+                     width="0%">
+                </div>
+              </div>
+              <span class="text-warn" style="font-size: 12px;">
+                0.0%
+              </span>
+            </div>
+          </td>
+          <td style="text-align: right;">
+            
+              <span style="color:#cbd5e0;">—</span>
+              <span class="sub-info">Trống dữ liệu</span>
+            
+          </td>
+        </tr>
+        
+        
+        
+        <tr>
+          <td><strong>9 tháng</strong></td>
+          <td style="text-align: right; color: #4a5568;">139</td>
+          <td style="text-align: right; font-weight: 500;">0</td>
+          <td>
+            <div style="white-space: nowrap;">
+              <div class="bar-container">
+                <div class="bar-fill bg-bad" 
+                     width="0%">
+                </div>
+              </div>
+              <span class="text-warn" style="font-size: 12px;">
+                0.0%
+              </span>
+            </div>
+          </td>
+          <td style="text-align: right;">
+            
+              <span style="color:#cbd5e0;">—</span>
+              <span class="sub-info">Trống dữ liệu</span>
+            
+          </td>
+        </tr>
+        
+        
+        
+        <tr>
+          <td><strong>12 tháng</strong></td>
+          <td style="text-align: right; color: #4a5568;">162</td>
+          <td style="text-align: right; font-weight: 500;">0</td>
+          <td>
+            <div style="white-space: nowrap;">
+              <div class="bar-container">
+                <div class="bar-fill bg-bad" 
+                     width="0%">
+                </div>
+              </div>
+              <span class="text-warn" style="font-size: 12px;">
+                0.0%
+              </span>
+            </div>
+          </td>
+          <td style="text-align: right;">
+            
+              <span style="color:#cbd5e0;">—</span>
+              <span class="sub-info">Trống dữ liệu</span>
+            
+          </td>
+        </tr>
+        
+      </tbody>
+    </table>
+  </div>
+
+  
+  <div class="section" style="padding-top: 0;">
+    <div class="warning-banner">
+      ⚠️ <strong>Cần ưu tiên cân bổ sung lứa:</strong> 
+      
+        <u>6 tháng</u>, 
+      
+        <u>9 tháng</u>, 
+      
+        <u>12 tháng</u>
+      
+      <span style="display: block; margin-top: 4px; font-size: 12px; opacity: 0.9;">
+        Các nhóm này hiện tại chưa đạt ngưỡng tiến độ tối thiểu 30.0% của tuần.
+      </span>
+    </div>
+  </div>
+  
+
+  <div class="footer">
+    Automatic report ─ &nbsp;|&nbsp;   27/05/2026 11:15
+  </div>
+
+</div>
+</body>
+</html>
