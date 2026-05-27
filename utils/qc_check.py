@@ -10,6 +10,8 @@ _HERD_JOIN_MIN_ROWS        = 20
 import os
 import pandas as pd
 
+from config.constants import WEIGHT_OUTLIER_LOW, WEIGHT_OUTLIER_HIGH
+
 
 def check_not_empty(df: pd.DataFrame | None, context: str = "") -> bool:
     if df is None or df.empty:
@@ -39,8 +41,8 @@ def check_no_all_null(
 def filter_weight_range(
     df: pd.DataFrame,
     col: str = "weight_kg",
-    low: float = 60.0,
-    high: float = 900.0, # there's no HF cow can not reach 900kg. (MBW = 600-720)
+    low: float = WEIGHT_OUTLIER_LOW,
+    high: float = WEIGHT_OUTLIER_HIGH,
     context: str = "",
 ) -> pd.DataFrame:
     if col not in df.columns:

@@ -10,17 +10,18 @@ import pandas as pd
 from utils.id_utils import strip_dot_zero
 
 
-
-
-# ── Public ────────────────────────────────────────────────────────────────────
 def merge_with_herd(
     weight_df: pd.DataFrame,
     herd_df: pd.DataFrame | None,
 ) -> pd.DataFrame:
     """
     Left join weight_df (ear_tag) <-> herd_df (transp_2).
-    Dieu chinh age_days va dim ve ngay can thuc te dua vao ngay snapshot herd.
-    age_month: uu tien age_month_fix (tinh chuan tu herd DB), fallback age_days.
+
+    Adjustment logic:
+      age_days / dim: lay tu herd snapshot roi tru day_diff de ve ngay can.
+      age_month     : lay age_month_fix truc tiep — column nay da duoc
+                      db_saver_total_herd tinh chinh xac cho truong hop
+                      DB bi tre (lag). Khong tru them day_diff.
     """
     if herd_df is None:
         print("   WARNING: Khong co herd data — cac cot herd se la null")
@@ -41,9 +42,6 @@ def merge_with_herd(
     herd_cols = ["no", "transp_2", "group_name", "age_days", "age_month_fix", "dim", "lac_no"]
     herd_sub  = herd_df[[c for c in herd_cols if c in herd_df.columns]].copy()
 
-    # Normalize ca hai phia ve cung dang truoc khi join.
-    # Herd side co the da duoc normalize boi ingest module, nhung ap dung lai
-    # dam bao nhat quan khi XLS source khong normalize truoc.
     df["ear_tag"]        = strip_dot_zero(df["ear_tag"])
     herd_sub["transp_2"] = strip_dot_zero(herd_sub["transp_2"])
 
@@ -52,9 +50,7 @@ def merge_with_herd(
         how="left", suffixes=("", "_herd"),
     )
 
-    # ── Dieu chinh Age & DIM ve ngay can ─────────────────────────────────────
-    # Herd snapshot thuong la ngay hom nay, con can co the ngay hom truoc.
-    # Phai tru di chenh lech de gia tri phan anh dung ngay can.
+    # ── age_days / dim: tru day_diff ve ngay can ──────────────────────────────
     match_mask = merged["no"].notna()
     merged.loc[match_mask, "_day_diff"] = (
         herd_snapshot - merged.loc[match_mask, "_date_parsed"]
@@ -67,7 +63,9 @@ def merge_with_herd(
                 - merged.loc[match_mask, "_day_diff"]
             )
 
-    # ── age_month ─────────────────────────────────────────────────────────────
+    # ── age_month: dung age_month_fix truc tiep ───────────────────────────────
+    # age_month_fix da duoc db_saver_total_herd tinh chinh xac cho ca XLS
+    # (hom nay) lan DB lag (1-4 ngay). Khong tru them day_diff o day.
     if "age_month_fix" in merged.columns:
         merged["age_month"] = pd.to_numeric(merged["age_month_fix"], errors="coerce")
     else:

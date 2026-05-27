@@ -1,21 +1,34 @@
 """
 core/load/csv_exporter.py
-Export CSV từ parquet master. DRY_RUN: skip.
+Export 2 file CSV tu parquet master.
+
+weight_db_api.csv     (CSV_CLEANED_DIR) — full detail, tat ca cot, tat ca rows
+DATA_MERGE_COW_ID.csv (CSV_LEGACY_DIR)  — monthly aggregate, 1 row per (month, cow)
 """
 from __future__ import annotations
 
 import duckdb
 import pandas as pd
 
+from config.constants import WEIGHT_OUTLIER_LOW, WEIGHT_OUTLIER_HIGH
 from config.paths import WEIGHT_PARQUET, CSV_CLEANED_DIR, CSV_LEGACY_DIR
 from config.settings import IS_DRY_RUN
 from core.load.atomic import atomic_write_csv
 from utils.console import vprint
 
-def _build_monthly_aggregated(df: pd.DataFrame) -> pd.DataFrame:
+
+# ── Aggregate: 1 thang, 1 con bo, 1 dong ─────────────────────────────────────
+def _build_monthly_aggregate(df: pd.DataFrame) -> pd.DataFrame:
     """
-    Aggregate theo (year_month, no): weight_kg → mean, categoricals → last.
-    Chỉ giữ records đã match herd (no not null).
+    Group by (year_month, no): 1 thang 1 con bo 1 dong cho team Operation.
+
+    weight_kg : mean cua cac gia tri trong [WEIGHT_OUTLIER_LOW, WEIGHT_OUTLIER_HIGH]
+    age_month : max (so thang lon nhat trong thang — gan ngay cuoi nhat)
+    age_days  : max, Int (so nguyen)
+    dim       : max, Int
+    lac_no    : max, Int
+    group_name: last (nhom cuoi cung trong thang)
+    animal_type: last
     """
     if "no" not in df.columns or "date" not in df.columns:
         return df
@@ -24,46 +37,52 @@ def _build_monthly_aggregated(df: pd.DataFrame) -> pd.DataFrame:
     if d.empty:
         return d
 
-    d["year_month"] = d["date"].str[:7]  # "YYYY-MM"
+    d["year_month"] = d["date"].astype(str).str[:7]
 
-    _num = [c for c in ["weight_kg", "age_month", "age_days", "dim"] if c in d.columns]
-    _cat = [c for c in ["ear_tag", "group_name", "animal_type",
-                         "source", "device", "lac_no"] if c in d.columns]
+    # Filter outlier truoc khi tinh trung binh weight
+    valid_w = d["weight_kg"].between(WEIGHT_OUTLIER_LOW, WEIGHT_OUTLIER_HIGH)
+    d["weight_for_agg"] = d["weight_kg"].where(valid_w)
 
-    agg = {**{c: "mean" for c in _num}, **{c: "last" for c in _cat}}
-    out = d.groupby(["year_month", "no"], as_index=False).agg(agg)
+    agg = d.groupby(["year_month", "no"], as_index=False).agg(
+        weight_kg   = ("weight_for_agg", "mean"),
+        age_month   = ("age_month",      "max"),
+        age_days    = ("age_days",        "max"),
+        dim         = ("dim",             "max"),
+        lac_no      = ("lac_no",          "max"),
+        group_name  = ("group_name",      "last"),
+        animal_type = ("animal_type",     "last"),
+    )
 
-    # ── Round numerics ────────────────────────────────────────────────────────
-    for c in ["weight_kg", "age_month"]:
-        if c in out.columns:
-            out[c] = out[c].round(1)
-    for c in ["age_days", "dim"]:
-        if c in out.columns:
-            out[c] = out[c].round(0).astype("Int16")
+    agg["weight_kg"] = agg["weight_kg"].round(1)
+    agg["age_month"] = agg["age_month"].round(1)
+    for col in ["age_days", "dim", "lac_no"]:
+        if col in agg.columns:
+            agg[col] = pd.to_numeric(agg[col], errors="coerce").round(0).astype("Int16")
 
-    return out.sort_values(["year_month", "no"]).reset_index(drop=True)
+    return agg.sort_values(["year_month", "no"]).reset_index(drop=True)
+
 
 def export_csv_from_parquet() -> None:
     if not WEIGHT_PARQUET.exists():
-        vprint("⚠️  csv_exporter: parquet chưa tồn tại → bỏ qua")
+        vprint("   csv_exporter: parquet chua ton tai -> bo qua")
         return
 
     if IS_DRY_RUN:
-        vprint("   🟡 DRY_RUN: skip CSV export")
+        vprint("   DRY_RUN: skip CSV export")
         return
 
     con = duckdb.connect()
     df  = con.execute(f"SELECT * FROM read_parquet('{WEIGHT_PARQUET}')").df()
     con.close()
 
-    # ── File 1: Full detail — legacy projects dùng ────────────────────────────
     CSV_CLEANED_DIR.mkdir(parents=True, exist_ok=True)
-    df_monthly = _build_monthly_aggregated(df)
-    atomic_write_csv(df_monthly, CSV_CLEANED_DIR / "weight_db_api.csv")
-    vprint(f"   📄 CSV full (legacy): {len(df_monthly):,} dòng → {CSV_CLEANED_DIR / 'weight_db_api.csv'}")
-
-    # ── File 2: Monthly aggregated — Operation Dept ───────────────────────────
     CSV_LEGACY_DIR.mkdir(parents=True, exist_ok=True)
-    df_monthly = _build_monthly_aggregated(df)
-    atomic_write_csv(df_monthly, CSV_LEGACY_DIR / "DATA_MERGE_COW_ID.csv")
-    vprint(f"   📄 CSV monthly (ops): {len(df_monthly):,} dòng → {CSV_LEGACY_DIR / 'DATA_MERGE_COW_ID.csv'}")
+
+    # File 1: full detail
+    atomic_write_csv(df, CSV_CLEANED_DIR / "weight_db_api.csv")
+    vprint(f"   weight_db_api.csv     : {len(df):,} rows -> {CSV_CLEANED_DIR}")
+
+    # File 2: monthly aggregate
+    df_agg = _build_monthly_aggregate(df)
+    atomic_write_csv(df_agg, CSV_LEGACY_DIR / "DATA_MERGE_COW_ID.csv")
+    vprint(f"   DATA_MERGE_COW_ID.csv : {len(df_agg):,} rows -> {CSV_LEGACY_DIR}")

@@ -5,6 +5,8 @@ Job scraping Gallagher AMC (GALLAGHER_1). Incremental.
 from __future__ import annotations
 
 import time
+import pandas as pd
+from datetime import datetime
 
 from config.paths import raw_device_dir
 from config.constants import GALLAGHER_DEVICE
@@ -26,6 +28,55 @@ import utils.telegram_utils as tg
 JOB_NAME    = "gallagher_weight"
 
 
+# ── RAW_PARSE_ONLY: đọc raw CSV từ disk thay vì gọi API ──────────────────────
+def _load_raw_from_disk(date_from: str, date_to: str) -> pd.DataFrame | None:
+    """
+    Đọc tất cả raw CSV trong raw_device_dir(GALLAGHER_DEVICE), filter theo
+    cột 'date' trong file. Raw CSV có cột: session_id, session_name, date,
+    time, ear_tag, weight, scan_date — đã được ghi bởi write_sessions().
+    """
+    from config.paths import raw_device_dir
+    raw_dir = raw_device_dir(GALLAGHER_DEVICE)
+    if not raw_dir.exists():
+        print(f"   WARNING: Gallagher raw dir không tồn tại: {raw_dir}")
+        return None
+
+    d_from = datetime.strptime(date_from, "%Y-%m-%d").date()
+    d_to   = datetime.strptime(date_to,   "%Y-%m-%d").date()
+
+    frames, skipped = [], 0
+    for csv_path in sorted(raw_dir.glob("*.csv")):
+        if csv_path.name.startswith("_"):   # bỏ qua state files
+            continue
+        try:
+            peek = pd.read_csv(csv_path, dtype=str, nrows=1)
+            if "date" not in peek.columns or peek.empty:
+                skipped += 1
+                continue
+            first_date = peek["date"].iloc[0][:10]
+            if not (date_from <= first_date <= date_to):
+                skipped += 1
+                continue
+            df = pd.read_csv(csv_path, dtype=str)
+            df = df[df["date"].between(date_from, date_to)]
+            if not df.empty:
+                frames.append(df)
+        except Exception as e:
+            print(f"   WARNING: {csv_path.name}: {e}")
+
+    if not frames:
+        print(f"   Không có Gallagher raw CSV trong [{date_from} → {date_to}]")
+        return None
+
+    combined = pd.concat(frames, ignore_index=True)
+    combined["source"] = "GALLAGHER"
+    combined["device"] = GALLAGHER_DEVICE
+    if "weight" in combined.columns and "weight_kg" not in combined.columns:
+        combined = combined.rename(columns={"weight": "weight_kg"})
+    print(f"   Gallagher raw: {len(frames)} files | {len(combined):,} animals | skip {skipped}")
+    return combined
+
+
 def run() -> dict:
     # ── Guard: device bị tắt ──────────────────────────────────────────────────
     if not DEVICE_ENABLED.get(GALLAGHER_DEVICE, True):
@@ -35,6 +86,32 @@ def run() -> dict:
 
     t0 = time.time()
     print(f"\n{'─'*60}\n🐄 Gallagher Weight Job\n{'─'*60}")
+
+    # ── RAW_PARSE_ONLY: đọc raw CSV, bỏ qua API ────────────────────────────────
+    from config.settings import RAW_PARSE_ONLY, DATE_FROM_OVERRIDE, DATE_TO_OVERRIDE
+    if RAW_PARSE_ONLY:
+        from datetime import date as _date, timedelta as _td
+        _df = DATE_FROM_OVERRIDE or (_date.today() - _td(days=7)).strftime("%Y-%m-%d")
+        _dt = DATE_TO_OVERRIDE   or _date.today().strftime("%Y-%m-%d")
+        print(f"   RAW_PARSE_ONLY: {_df} → {_dt}")
+        combined = _load_raw_from_disk(_df, _dt)
+        if combined is None or combined.empty:
+            return {"status": "no_new_data", "reason": "no raw CSV in range"}
+        # Bỏ qua Steps 1–2, nhảy thẳng vào transform
+        combined = clean_ear_tag(combined)
+        herd_df, herd_source = load_herd()
+        combined = merge_with_herd(combined, herd_df)
+        check_herd_join_rate(combined, job_name=JOB_NAME, context="Gallagher RAW herd join")
+        combined  = add_animal_type(combined)
+        df_final  = standardize_schema(combined)
+        df_final  = filter_weight_range(df_final, context="Gallagher RAW")
+        df_master = append_and_dedup(df_final)
+        dur = round(time.time() - t0, 2)
+        log(JOB_NAME, GALLAGHER_DEVICE, "completed", dur,
+            f"raw_parse_only | {_df}~{_dt} | new={len(df_final)} | master={len(df_master)}")
+        print(f"   Gallagher RAW done | {len(df_final):,} | master: {len(df_master):,} | {dur}s")
+        return {"status": "completed", "mode": "raw_parse_only",
+                "rows_new": len(df_final), "rows_master": len(df_master)}
 
     # ── Step 1: Lấy saved IDs + fetch sessions mới ───────────────────────────
     # Dung disk scan lam ground truth, khong dung state file

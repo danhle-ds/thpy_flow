@@ -70,3 +70,7 @@ def week_of_month(d) -> int:
 #CLEAN GALLAGHER_LIMIT
 GALLAGHER_ANIMAL_THRESHOLD = 9000
 GALLAGHER_CLEANUP_BUFFER = 2000
+
+# ── Weight range dùng cho filter outlier và aggregate CSV ─────────────────────
+WEIGHT_OUTLIER_LOW  = 60.0
+WEIGHT_OUTLIER_HIGH = 900.0
